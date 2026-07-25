@@ -440,6 +440,49 @@ async def handler(event):
                 full = await event.ABH(GetFullChatRequest(chat_id))
                 members_count = len(full.full_chat.users)
                 restricted_rights_text += "🔓 مفتوحة بالكامل (مجموعة عادية)"
+# 📡 ميزة رادار كشف وتجميع بيانات الكروب الحالي
+    if event.is_group and raw_text.strip() == "رادار":
+        status_msg = await event.reply("📡 **جاري رصد وتجميع الإحداثيات الاستخباراتية للمجموعة...**")
+        try:
+            chat = await event.get_chat()
+            chat_id = chat.id
+            title = chat.title
+            username = f"@{chat.username}" if getattr(chat, 'username', None) else "مجموعة خاصة"
+            
+            from telethon.tl.functions.channels import GetFullChannelRequest
+            from telethon.tl.functions.messages import GetFullChatRequest
+            from telethon.tl.types import Channel
+            
+            about = "لا يوجد وصف"
+            members_count = "غير معروف"
+            admins_count = "غير معروف"
+            slowmode = "غير مفعّل"
+            restricted_rights_text = "صلاحيات الأعضاء الافتراضية:\n"
+            
+            if isinstance(chat, Channel):
+                # 💡 تم تعديل الاستدعاء هنا ليستخدم ABH مباشرة
+                full = await ABH(GetFullChannelRequest(chat))
+                about = full.full_chat.about or "لا يوجد وصف"
+                members_count = full.full_chat.participants_count or "غير معروف"
+                admins_count = full.full_chat.admins_count or "غير معروف"
+                slowmode = f"{full.full_chat.slowmode_seconds} ثانية" if full.full_chat.slowmode_seconds else "غير مفعّل"
+                
+                rights = chat.default_banned_rights
+                if rights:
+                    r_list = []
+                    r_list.append("❌ الرسائل" if rights.send_messages else "✅ الرسائل")
+                    r_list.append("❌ الوسائط" if rights.send_media else "✅ الوسائط")
+                    r_list.append("❌ الملصقات" if rights.send_stickers else "✅ الملصقات")
+                    r_list.append("❌ التثبيت" if rights.pin_messages else "✅ التثبيت")
+                    r_list.append("❌ الإضافة" if rights.invite_users else "✅ الإضافة")
+                    restricted_rights_text += " | ".join(r_list)
+                else:
+                    restricted_rights_text += "🔓 مفتوحة بالكامل (كل الصلاحيات متاحة)"
+            else:
+                # 💡 تم تعديل الاستدعاء هنا أيضاً
+                full = await ABH(GetFullChatRequest(chat_id))
+                members_count = len(full.full_chat.users)
+                restricted_rights_text += "🔓 مفتوحة بالكامل (مجموعة عادية)"
 
             status_flags = []
             if getattr(chat, 'verified', False): status_flags.append("🟢 موثق")
@@ -470,6 +513,7 @@ async def handler(event):
         except Exception as e:
             await status_msg.edit(f"❌ **فشل رادار الكروب:** حدث خطأ أثناء جلب البيانات.\nالخطأ: `{e}`")
         return
+
 
     # 🖥️ أوامر أدوات النظام المباشرة والسريعة
     if raw_text in ["ديدي وضعك", "ديدي السيرفر", "ديدي النظام"]:
@@ -956,14 +1000,21 @@ async def handler(event):
         except Exception as e:
             await status_msg.edit(f"❌ **حدث خطأ أثناء الجلب:** `{e}`\n\n💡 *تأكد من صحة الرابط وأنك مشترك بالقناة إذا كانت خاصة.*")
             
-        finally:
-            # تنظيف كافة الملفات المؤقتة من الموبايل/الحاسبة فوراً
+                finally:
+            # تنظيف كافة الملفات المؤقتة من السيرفر فوراً
             for f in temp_files:
                 if os.path.exists(f):
                     try:
                         os.remove(f)
                     except Exception:
                         pass
+            try:
+                if fetched_msg and fetched_msg.media:
+                    await status_msg.delete()
+            except Exception:
+                pass
+    # (ابدأ القسم الذي يليه مباشرة بدون كتابة returns هنا)
+
             try:
                 if fetched_msg and fetched_msg.media:
                     await status_msg.delete()
@@ -1159,3 +1210,6 @@ async def ultra_ttl_saver(event):
                 os.remove(file_path)
             except Exception:
                 pass
+ABH.start()
+print("🤖 السكربت يعمل الآن بنجاح على السيرفر...")
+ABH.run_until_disconnected()
