@@ -6,34 +6,23 @@ from التخزين import *
 from ذاتية import *
 from الميمز import *
 from بوتات import *
-@ABH.on(events.NewMessage(pattern="^اطفاء$", from_users=[1910015590]))
+@ABH.on(events.NewMessage(pattern="^اطفاء$", from_users=[1910015590], outgoing=True))
 async def shutdown(event):
-    me = await ABH.get_me()
-    id = me.id
-    if id == 1910015590:
-        return
     await event.reply("🔴 جارٍ إيقاف اليوزربوت ...")
     await asyncio.sleep(1)
     await ABH.disconnect()
     sys.exit(0)
-@ABH.on(events.NewMessage(pattern="^رست$", from_users=[1910015590]))
+@ABH.on(events.NewMessage(pattern="^رست$", from_users=[1910015590], outgoing=True))
 async def resetbot(event):
-    id = await event.get_reply_message()
-    if id and id.id == 1910015590:
-        return
     await asyncio.sleep(1)
     await restart_bot(event)
-@ABH.on(events.NewMessage(pattern="^.حدث$", from_users=[1910015590]))
+@ABH.on(events.NewMessage(pattern="^.حدث$", from_users=[1910015590], outgoing=True))
 async def resetbot(event):
-    id = await event.get_reply_message()
-    if id and id.id == 1910015590:
-        return
-    await asyncio.sleep(1)
+    await event.reply('يجري التحديث')
     await update_repo(event)
-@ABH.on(events.NewMessage(pattern="^اعادة تشغيل$", outgoing=True))
+@ABH.on(events.NewMessage(pattern="^اعادة تشغيل$", incoming=True))
 async def restart_bot(event):
     await event.respond("♻️ جارٍ إعادة تشغيل اليوزربوت ...")
-    await asyncio.sleep(1)
     os.execv(sys.executable, [sys.executable, "run.py"])
 async def run_cmd(command: str):
     process = await asyncio.create_subprocess_shell(
