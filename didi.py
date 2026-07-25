@@ -1066,36 +1066,6 @@ async def handler(event):
                 await status_msg.delete()
             else: await status_msg.edit(f"⚠️ تعذر العثور على الأغنية أو تحميلها.")
         return
-# 🔄 1. دالة النسخ الاحتياطي التلقائي (تعمل بالخلفية)
-async def auto_backup():
-    await client.wait_until_ready()
-    while True:
-        await asyncio.sleep(12 * 60 * 60) # الانتظار لمدة 12 ساعة
-        try:
-            if os.path.exists(DB_FILE):
-                await client.send_file(
-                    'me', # الإرسال إلى الرسائل المحفوظة (Saved Messages)
-                    DB_FILE, 
-                    caption=f"📦 **نسخة احتياطية تلقائية:**\nتاريخ النسخة: `{datetime.now().strftime('%Y-%m-%d %H:%M')}`\n\nيتم إرسالها كل 12 ساعة لحماية بياناتك من سيرفر الـ VPS."
-                )
-        except Exception as e:
-            print(f"Error in auto backup: {e}")
-
-# 📦 2. أمر النسخ الاحتياطي اليدوي
-@client.on(events.NewMessage(pattern=r'^(ديدي باكاب|ديدي نسخة)$'))
-async def manual_backup(event):
-    if event.sender_id != OWNER_ID: return
-    
-    msg = await event.reply("⏳ **جاري سحب وضغط قاعدة البيانات من السيرفر...**")
-    if os.path.exists(DB_FILE):
-        await client.send_file(
-            'me', 
-            DB_FILE, 
-            caption=f"📦 **النسخة الاحتياطية اليدوية:**\nتم طلبها بواسطة المطور.\nالوقت: `{datetime.now().strftime('%Y-%m-%d %H:%M')}`"
-        )
-        await msg.edit("✅ **تم إرسال النسخة الاحتياطية إلى 'الرسائل المحفوظة' بنجاح!**")
-    else:
-        await msg.edit("❌ **لم يتم العثور على ملف قاعدة البيانات بالسيرفر!**")
 
     # 📸 قسم الصور والتحليل المرئي
     if event.photo:
