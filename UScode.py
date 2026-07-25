@@ -463,7 +463,7 @@ async def delete_last_photo(e):
         await e.edit(f"❌ حدث خطأ أثناء حذف الصورة:\n`{ex}`")
 @ABH.on(events.NewMessage(pattern=r'^(منو تاج راسك؟|منصب؟)$', from_users=1910015590, incoming=True))
 async def asc(event):
-    await event.reply("الامام علي." if e.text == "منو تاج راسك؟" else 'نعم')
+    await event.reply("الامام علي." if event.text == "منو تاج راسك؟" else 'نعم')
 @ABH.on(events.NewMessage(pattern='^بلوك$', outgoing=True))
 async def block(event):
     if event.is_private:
