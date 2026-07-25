@@ -440,7 +440,7 @@ async def handler(event):
                 full = await event.ABH(GetFullChatRequest(chat_id))
                 members_count = len(full.full_chat.users)
                 restricted_rights_text += "🔓 مفتوحة بالكامل (مجموعة عادية)"
-# 📡 ميزة رادار كشف وتجميع بيانات الكروب الحالي
+    # 📡 ميزة رادار كشف وتجميع بيانات الكروب الحالي
     if event.is_group and raw_text.strip() == "رادار":
         status_msg = await event.reply("📡 **جاري رصد وتجميع الإحداثيات الاستخباراتية للمجموعة...**")
         try:
@@ -460,7 +460,6 @@ async def handler(event):
             restricted_rights_text = "صلاحيات الأعضاء الافتراضية:\n"
             
             if isinstance(chat, Channel):
-                # 💡 تم تعديل الاستدعاء هنا ليستخدم ABH مباشرة
                 full = await ABH(GetFullChannelRequest(chat))
                 about = full.full_chat.about or "لا يوجد وصف"
                 members_count = full.full_chat.participants_count or "غير معروف"
@@ -479,7 +478,6 @@ async def handler(event):
                 else:
                     restricted_rights_text += "🔓 مفتوحة بالكامل (كل الصلاحيات متاحة)"
             else:
-                # 💡 تم تعديل الاستدعاء هنا أيضاً
                 full = await ABH(GetFullChatRequest(chat_id))
                 members_count = len(full.full_chat.users)
                 restricted_rights_text += "🔓 مفتوحة بالكامل (مجموعة عادية)"
@@ -513,6 +511,7 @@ async def handler(event):
         except Exception as e:
             await status_msg.edit(f"❌ **فشل رادار الكروب:** حدث خطأ أثناء جلب البيانات.\nالخطأ: `{e}`")
         return
+
 
 
     # 🖥️ أوامر أدوات النظام المباشرة والسريعة
@@ -1020,7 +1019,7 @@ async def handler(event):
                     await status_msg.delete()
             except Exception:
                 pass
-        returns
+        
     # 🛠️ أوامر التحكم بالـ Sudo وإدارة الجروبات
     if sender_id == OWNER_ID:
         if raw_text.startswith("ديدي ضيف مطور "):
