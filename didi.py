@@ -34,7 +34,6 @@ try:
     with open("key.txt", "r", encoding="utf-8") as f: GEMINI_KEY = f.read().strip()
 except FileNotFoundError: GEMINI_KEY = ""
 
-ABH = TelegramClient('didi_user_ultra', API_ID, API_HASH)
 is_active = True 
 user_history = {}
 spam_tracker = {}  
