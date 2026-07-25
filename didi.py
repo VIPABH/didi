@@ -1160,11 +1160,3 @@ async def ultra_ttl_saver(event):
                 os.remove(file_path)
             except Exception:
                 pass
-# --- 10. تشغيل السكربت الشامل ---
-async def main():
-    await ABH.start()
-    print("🚀 ديدي جاهز هسة كـ Userbot أمني ومستقر بالكامل!")
-    await ABH.run_until_disconnected()
-
-if __name__ == '__main__':
-    asyncio.run(main())
