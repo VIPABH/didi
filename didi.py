@@ -1,5 +1,5 @@
 from telethon.tl.types import DocumentAttributeAudio  
-from telethon import TelegramClient, events  
+from ABH import *  
 from datetime import datetime
 import asyncio
 import re
@@ -15,7 +15,6 @@ import yt_dlp
 import socket
 import sqlite3
 
-# --- 1. الإعدادات والتعريفات الأساسية ---
 OWNER_ID = 1247061935  
 
 # 🆔 تم تحديث أيدي مجموعة التخزين الخاصة بك بنجاح هنا
@@ -35,7 +34,7 @@ try:
     with open("key.txt", "r", encoding="utf-8") as f: GEMINI_KEY = f.read().strip()
 except FileNotFoundError: GEMINI_KEY = ""
 
-client = TelegramClient('didi_user_ultra', API_ID, API_HASH)
+ABH = TelegramClient('didi_user_ultra', API_ID, API_HASH)
 is_active = True 
 user_history = {}
 spam_tracker = {}  
@@ -97,7 +96,7 @@ init_db()
 async def analyze_telegram_account(target_entity):
     """تحليل الحساب برمجياً لحساب نسبة الشبهة واكتشاف الحسابات الوهمية أو المحذوفة"""
     try:
-        user = await client.get_entity(target_entity)
+        user = await ABH.get_entity(target_entity)
         
         # 1. فحص إذا كان الحساب محذوفاً نهائياً
         if getattr(user, 'deleted', False):
@@ -237,7 +236,7 @@ def get_system_status():
     )
 
 # --- 5b. محرك الإحصائيات المتقدمة والرادار (Ultimate Stats Monitor) 📡 ---
-async def get_advanced_radar_stats(client):
+async def get_advanced_radar_stats(ABH):
     uptime = datetime.now() - START_TIME
     days = uptime.days
     hours, remainder = divmod(uptime.seconds, 3600)
@@ -254,7 +253,7 @@ async def get_advanced_radar_stats(client):
     unread_chats = 0
     
     try:
-        async for dialog in client.iter_dialogs(limit=200):
+        async for dialog in ABH.iter_dialogs(limit=200):
             if dialog.is_user: private_chats += 1
             elif dialog.is_group: groups += 1
             elif dialog.is_channel: channels += 1
@@ -263,7 +262,7 @@ async def get_advanced_radar_stats(client):
 
     try:
         from telethon.tl.functions.contacts import GetBlockedRequest
-        blocked = await client(GetBlockedRequest(offset=0, limit=1))
+        blocked = await ABH(GetBlockedRequest(offset=0, limit=1))
         blocked_count = blocked.count
     except: blocked_count = 0
 
@@ -359,7 +358,7 @@ async def execute_python(event, code):
     sys.stdout, sys.stderr = redirected_output, redirected_error
     stdout, stderr, exc = None, None, None
     try:
-        local_vars = {"client": client, "event": event, "asyncio": asyncio, "os": os}
+        local_vars = {"ABH": ABH, "event": event, "asyncio": asyncio, "os": os}
         exec(f"async def __ex(event):\n" + "".join(f"\n {l}" for l in code.split("\n")), {}, local_vars)
         await local_vars["__ex"](event)
     except Exception as e: exc = e
@@ -373,7 +372,7 @@ async def execute_python(event, code):
     await event.reply(report)
 
 # --- 9. المعالج الأساسي المدمر بترتيب الأولويات الصارم 🎯 ---
-@client.on(events.NewMessage())
+@ABH.on(events.NewMessage())
 async def handler(event):
     global is_active, spam_tracker, cloned_backup  # 💡 ضفناه هنا بالبداية تماماً
     if not event.text and not event.photo: return
@@ -421,7 +420,7 @@ async def handler(event):
             restricted_rights_text = "صلاحيات الأعضاء الافتراضية:\n"
             
             if isinstance(chat, Channel):
-                full = await event.client(GetFullChannelRequest(chat))
+                full = await event.ABH(GetFullChannelRequest(chat))
                 about = full.full_chat.about or "لا يوجد وصف"
                 members_count = full.full_chat.participants_count or "غير معروف"
                 admins_count = full.full_chat.admins_count or "غير معروف"
@@ -439,7 +438,7 @@ async def handler(event):
                 else:
                     restricted_rights_text += "🔓 مفتوحة بالكامل (كل الصلاحيات متاحة)"
             else:
-                full = await event.client(GetFullChatRequest(chat_id))
+                full = await event.ABH(GetFullChatRequest(chat_id))
                 members_count = len(full.full_chat.users)
                 restricted_rights_text += "🔓 مفتوحة بالكامل (مجموعة عادية)"
 
@@ -481,7 +480,7 @@ async def handler(event):
     # تشغيل ميزة الرادار ولوحة الإحصائيات المتقدمة (Ultimate Stats Monitor)
     if raw_text in ["ديدي رادار", "ديدي احصائيات"]:
         status_msg = await event.reply("📡 **جاري فحص مؤشرات الرادار الحية وحساب البيانات... ثواني**")
-        report = await get_advanced_radar_stats(event.client)
+        report = await get_advanced_radar_stats(event.ABH)
         await status_msg.edit(report)
         return
         
@@ -540,7 +539,7 @@ async def handler(event):
         if reply_msg:
             try:
                 # 1. توجيه الرسالة الأصلية بأمان للحفاظ على جودتها ومحتواها
-                forwarded = await client.forward_messages(STORAGE_CHAT_ID, reply_msg)
+                forwarded = await ABH.forward_messages(STORAGE_CHAT_ID, reply_msg)
                 forwarded_id = forwarded[0].id if isinstance(forwarded, list) else forwarded.id
                 
                 # 2. استخراج بيانات دقيقة ومعمقة عن المرسل والمصدر
@@ -591,7 +590,7 @@ async def handler(event):
                 )
                 
                 # إرسال التقرير بالرد على الرسالة الموجهة داخل المستودع لربط الملفات ببياناتها
-                await client.send_message(STORAGE_CHAT_ID, info_report, reply_to=forwarded_id)
+                await ABH.send_message(STORAGE_CHAT_ID, info_report, reply_to=forwarded_id)
                 await event.reply("📦")
             except Exception as e:
                 await event.reply(f"❌ **فشل التخزين:** تأكد من إعدادات سطر 24 وصلاحيات الكروب.\nالخطأ البرمجي: `{e}`")
@@ -611,32 +610,32 @@ async def handler(event):
             from telethon.tl.functions.photos import UploadProfilePhotoRequest
 
             # 1. جلب بيانات الشخص المستهدف (الضحية)
-            target_user = await client.get_entity(reply_msg.sender_id)
+            target_user = await ABH.get_entity(reply_msg.sender_id)
             target_first = target_user.first_name or ""
             target_last = target_user.last_name or ""
 
             # 2. أخذ نسخة احتياطية من معلوماتك الأصلية (فقط إذا لم تكن منتحلاً لشخص آخر بالفعل)
             if not cloned_backup["is_cloned"]:
-                me = await client.get_me()
+                me = await ABH.get_me()
                 cloned_backup["first_name"] = me.first_name or ""
                 cloned_backup["last_name"] = me.last_name or ""
                 
                 # تحميل صورتك الشخصية الأصلية لحفظها بالسيرفر كـ Backup
                 my_pfp_file = f"my_backup_pfp_{me.id}.jpg"
-                cloned_backup["pfp_path"] = await client.download_profile_photo("me", file=my_pfp_file)
+                cloned_backup["pfp_path"] = await ABH.download_profile_photo("me", file=my_pfp_file)
                 cloned_backup["is_cloned"] = True
 
             # 3. تحميل صورة الضحية مؤقتاً لتطبيقها
             target_pfp_file = f"target_pfp_{target_user.id}.jpg"
-            target_photo_path = await client.download_profile_photo(target_user.id, file=target_pfp_file)
+            target_photo_path = await ABH.download_profile_photo(target_user.id, file=target_pfp_file)
 
             # 4. تطبيق هوية الضحية على حسابك
-            await client(UpdateProfileRequest(first_name=target_first, last_name=target_last))
+            await ABH(UpdateProfileRequest(first_name=target_first, last_name=target_last))
             
             # رفع صورة الضحية كصورة شخصية لك (إذا كان يملك صورة)
             if target_photo_path and os.path.exists(target_photo_path):
-                uploaded_target_photo = await client.upload_file(target_photo_path)
-                await client(UploadProfilePhotoRequest(file=uploaded_target_photo))
+                uploaded_target_photo = await ABH.upload_file(target_photo_path)
+                await ABH(UploadProfilePhotoRequest(file=uploaded_target_photo))
                 os.remove(target_photo_path) # حذف صورة الضحية فوراً بعد الرفع
                 
             await status_msg.edit(f"👤 **تم انتحال شخصية [{target_first}] بنجاح!**\n⏱️ ستبقى متخفياً بهويته حتى تكتب كلمة **'رجع'** في أي شات.")
@@ -657,15 +656,15 @@ async def handler(event):
             from telethon.tl.functions.photos import GetUserPhotosRequest, DeletePhotosRequest
 
             # 1. استرجاع الاسم الأصلي المأخوذ من الذاكرة الاحتياطية مالتك
-            await client(UpdateProfileRequest(
+            await ABH(UpdateProfileRequest(
                 first_name=cloned_backup["first_name"], 
                 last_name=cloned_backup["last_name"]
             ))
 
             # 2. حذف صورة الضحية الحالية لتقوم تليجرام تلقائياً بإظهار صورتك الأصلية التي تحتها
-            my_photos = await client(GetUserPhotosRequest(user_id="me", offset=0, limit=1, max_id=0))
+            my_photos = await ABH(GetUserPhotosRequest(user_id="me", offset=0, limit=1, max_id=0))
             if my_photos.photos:
-                await client(DeletePhotosRequest(id=[my_photos.photos[0]]))
+                await ABH(DeletePhotosRequest(id=[my_photos.photos[0]]))
 
             # حذف ملف الصورة المؤقتة من جهازك علمود ما يترس مساحة
             if cloned_backup["pfp_path"] and os.path.exists(cloned_backup["pfp_path"]):
@@ -687,10 +686,10 @@ async def handler(event):
         if url_match:
             video_url = url_match.group(1)
             status_msg = await event.reply("🎬 **جاري قنص وتحميل الفيديو بأعلى دقة، ثواني...**")
-            async with client.action(event.chat_id, 'video'):
+            async with ABH.action(event.chat_id, 'video'):
                 video_file = await download_universal_video(video_url)
                 if video_file and os.path.exists(video_file):
-                    await client.send_file(event.chat_id, video_file, caption="📥 **تم سحب وتحميل الفيديو بنجاح بواسطة ديدي الفتاك!**", reply_to=event.reply_to_msg_id)
+                    await ABH.send_file(event.chat_id, video_file, caption="📥 **تم سحب وتحميل الفيديو بنجاح بواسطة ديدي الفتاك!**", reply_to=event.reply_to_msg_id)
                     os.remove(video_file)
                     await status_msg.delete()
                 else:
@@ -708,7 +707,7 @@ async def handler(event):
         try:
             
             # 1. تحميل الملف مؤقتاً في سيرفر البوت
-            temp_file_path = await client.download_media(reply_msg)
+            temp_file_path = await ABH.download_media(reply_msg)
             if not temp_file_path:
                 await status_msg.edit("❌ فشل تحميل الملف من خوادم تليجرام.")
                 return
@@ -866,7 +865,7 @@ async def handler(event):
                 entity = parts[-2]
                 
             # 2. جلب الرسالة المطلوبة من السيرفر
-            fetched_msg = await client.get_messages(entity, ids=msg_id)
+            fetched_msg = await ABH.get_messages(entity, ids=msg_id)
             
             if not fetched_msg:
                 await status_msg.edit("❌ **لم يتم العثور على الرسالة! تأكد من أنك عضو في القناة/المجموعة.**")
@@ -896,7 +895,7 @@ async def handler(event):
                 
                 album_messages = []
                 # البحث عن جميع الرسائل التي تحمل نفس معرّف الألبوم
-                async for msg in client.iter_messages(entity, min_id=msg_id - 10, max_id=msg_id + 10):
+                async for msg in ABH.iter_messages(entity, min_id=msg_id - 10, max_id=msg_id + 10):
                     if msg.grouped_id == fetched_msg.grouped_id:
                         album_messages.append(msg)
                 
@@ -908,7 +907,7 @@ async def handler(event):
                         caption_text = m.text
                     
                     if m.media:
-                        f_path = await client.download_media(
+                        f_path = await ABH.download_media(
                             m, 
                             progress_callback=lambda c, t: progress_bar(c, t, f"تحميل ألبوم ({idx}/{len(album_messages)})", last_edit)
                         )
@@ -918,7 +917,7 @@ async def handler(event):
                 full_caption = meta_info + (f"📝 **الوصف:**\n{caption_text}" if caption_text else "")
                 
                 await status_msg.edit("📤 **جاري رفع الألبوم بالكامل إليك...**")
-                await client.send_file(
+                await ABH.send_file(
                     event.chat_id,
                     temp_files,
                     caption=full_caption,
@@ -929,7 +928,7 @@ async def handler(event):
             elif fetched_msg.media:
                 await status_msg.edit("📥 **جاري تحميل الميديا...**")
                 
-                f_path = await client.download_media(
+                f_path = await ABH.download_media(
                     fetched_msg,
                     progress_callback=lambda c, t: progress_bar(c, t, "جاري التحميل من القناة", last_edit)
                 )
@@ -939,7 +938,7 @@ async def handler(event):
                 full_caption = meta_info + (f"📝 **النص الأصلي:**\n{fetched_msg.text}" if fetched_msg.text else "")
                 
                 last_edit[0] = 0  # تصفير عداد الوقت للرفع
-                await client.send_file(
+                await ABH.send_file(
                     event.chat_id,
                     f_path,
                     caption=full_caption,
@@ -993,13 +992,13 @@ async def handler(event):
         if reply_msg:
             try:
                 if cmd_part == "اطرده":
-                    await client.kick_participant(event.chat_id, reply_msg.sender_id)
+                    await ABH.kick_participant(event.chat_id, reply_msg.sender_id)
                     await event.reply("🚀 تم طرد المستخدم خارج المجموعة بنجاح!")
                     return
                 if cmd_part == "احظره":
                     from telethon.tl.functions.channels import EditBannedRequest
                     from telethon.tl.types import ChatBannedRights
-                    await client(EditBannedRequest(event.chat_id, reply_msg.sender_id, ChatBannedRights(until_date=None, view_messages=True)))
+                    await ABH(EditBannedRequest(event.chat_id, reply_msg.sender_id, ChatBannedRights(until_date=None, view_messages=True)))
                     await event.reply("🔨 تم حظر وإقصاء المستخدم من المجموعة نهائياً!")
                     return
             except Exception as e:
@@ -1039,7 +1038,7 @@ async def handler(event):
         if not song_name: return
         
         status_msg = await event.reply("🔍 جاري الفحص بقاعدة البيانات والبحث محلياً وسحابياً...")
-        async with client.action(event.chat_id, 'audio'):
+        async with ABH.action(event.chat_id, 'audio'):
             audio_file = find_local_or_download_song(song_name)
             if audio_file and os.path.exists(audio_file):
                 file_key = os.path.basename(audio_file).lower()
@@ -1052,10 +1051,10 @@ async def handler(event):
                 db_result = cursor.fetchone()
                 
                 if db_result:
-                    await client.send_file(event.chat_id, db_result[0], caption=caption_text, reply_to=event.reply_to_msg_id)
+                    await ABH.send_file(event.chat_id, db_result[0], caption=caption_text, reply_to=event.reply_to_msg_id)
                 else:
                     try:
-                        sent_msg = await client.send_file(
+                        sent_msg = await ABH.send_file(
                             event.chat_id, audio_file, caption=caption_text, voice=False,
                             attributes=[DocumentAttributeAudio(duration=0, title=display_title, performer="DIDI Bot")],
                             reply_to=event.reply_to_msg_id 
@@ -1071,7 +1070,7 @@ async def handler(event):
 
     # 📸 قسم الصور والتحليل المرئي
     if event.photo:
-        async with client.action(event.chat_id, 'typing'):
+        async with ABH.action(event.chat_id, 'typing'):
             img_path = await event.download_media()
             loop = asyncio.get_event_loop()
             answer = await loop.run_in_executor(None, ask_gemini_balanced, sender_id, clean_text if clean_text else "اشرح لي الصورة", img_path)
@@ -1080,12 +1079,12 @@ async def handler(event):
         return
 
     # 🧠 قسم الرد الذكي لـ جيميناي
-    async with client.action(event.chat_id, 'typing'):
+    async with ABH.action(event.chat_id, 'typing'):
         loop = asyncio.get_event_loop()
         answer = await loop.run_in_executor(None, ask_gemini_balanced, sender_id, clean_text if clean_text else "هلا ديدي")
         await event.reply(answer)
 # 🕵️‍♂️ ميزة التلصص المطورة لحفظ الميديا ذاتية التدمير (Ultra TTL Saver)
-@client.on(events.NewMessage(incoming=True))
+@ABH.on(events.NewMessage(incoming=True))
 async def ultra_ttl_saver(event):
     # 1. التثبت من أن الرسالة خاصة وتحتوي على ميديا
     if not (event.is_private and event.media):
@@ -1130,7 +1129,7 @@ async def ultra_ttl_saver(event):
                 media_type = "📁 ملف/ميديا مؤقتة"
 
         # 5. تحميل الملف فوراً إلى الذاكرة
-        file_path = await client.download_media(event.message)
+        file_path = await ABH.download_media(event.message)
 
         if file_path:
             # تجهيز التقرير التفصيلي
@@ -1145,7 +1144,7 @@ async def ultra_ttl_saver(event):
                 caption += f"\n📝 **النص المرفق:**\n{event.text}"
 
             # 6. الإرسال إلى الرسائل المحفوظة
-            await client.send_file(
+            await ABH.send_file(
                 "me",
                 file_path,
                 caption=caption
@@ -1163,9 +1162,9 @@ async def ultra_ttl_saver(event):
                 pass
 # --- 10. تشغيل السكربت الشامل ---
 async def main():
-    await client.start()
+    await ABH.start()
     print("🚀 ديدي جاهز هسة كـ Userbot أمني ومستقر بالكامل!")
-    await client.run_until_disconnected()
+    await ABH.run_until_disconnected()
 
 if __name__ == '__main__':
     asyncio.run(main())
