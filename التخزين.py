@@ -1,6 +1,6 @@
 from telethon.tl.functions.channels import CreateChannelRequest
 from shortcuts import *  # type: ignore
-from config import *  # type: ignore
+from التخزين import *  # type: ignore
 from ABH import *  # type: ignore
 import re, os, json
 async def create_group(name, about):
