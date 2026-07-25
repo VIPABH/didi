@@ -44,6 +44,7 @@ cloned_backup = {
     "pfp_path": None,
     "is_cloned": False
 }
+
 # --- 2. محرك قاعدة البيانات SQLite3 🗄️ ---
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -97,14 +98,12 @@ async def analyze_telegram_account(target_entity):
     try:
         user = await ABH.get_entity(target_entity)
         
-        # 1. فحص إذا كان الحساب محذوفاً نهائياً
         if getattr(user, 'deleted', False):
             return "❌ **حساب محذوف!**\nهذا الحساب تم حذفه بالكامل وتصفيته من سيرفرات التليجرام الافتراضية."
             
         score = 0
         reasons = []
         
-        # 2. فحص التصنيفات الرسمية لشركة تليجرام
         if getattr(user, 'scam', False):
             score += 100
             reasons.append("- ⚠️ الحساب مصنف رسمياً كـ **نصاب (Scam)** من تليجرام.")
@@ -115,7 +114,6 @@ async def analyze_telegram_account(target_entity):
             score += 40
             reasons.append("- 🤖 الحساب عبارة عن بوت مبرمج وليس حساب مستخدم طبيعي.")
             
-        # 3. فحص الخصائص المادية للحساب الجانبي
         if not user.photo:
             score += 30
             reasons.append("- 🖼️ لا توجد صورة شخصية للحساب (No Profile Photo).")
@@ -123,7 +121,6 @@ async def analyze_telegram_account(target_entity):
             score += 25
             reasons.append("- 🏷️ الحساب بدون معرف عام/يوزر نيم (No Username).")
             
-        # تحديد النتيجة العامة بناءً على مجموع النقاط
         if score == 0:
             status_text = "🟢 آمن ونظيف وطبيعي 100%"
         elif score <= 30:
@@ -172,7 +169,7 @@ def ip_lookup(ip_address):
             f"📍 المدينة: `{res.get('city')}`\n"
             f"📡 الشركة المزودة (ISP): `{res.get('isp')}`\n"
             f"🗺️ الإحداثيات: `{res.get('lat')}, {res.get('lon')}`\n"
-            f"⏰ التوقيت本地: `{res.get('timezone')}`"
+            f"⏰ التوقيت: `{res.get('timezone')}`"
         )
     except: return "⚠️ فشل الاتصال بقاعدة بيانات الأيبيات."
 
@@ -235,7 +232,7 @@ def get_system_status():
     )
 
 # --- 5b. محرك الإحصائيات المتقدمة والرادار (Ultimate Stats Monitor) 📡 ---
-async def get_advanced_radar_stats(ABH):
+async def get_advanced_radar_stats(ABH_client):
     uptime = datetime.now() - START_TIME
     days = uptime.days
     hours, remainder = divmod(uptime.seconds, 3600)
@@ -252,7 +249,7 @@ async def get_advanced_radar_stats(ABH):
     unread_chats = 0
     
     try:
-        async for dialog in ABH.iter_dialogs(limit=200):
+        async for dialog in ABH_client.iter_dialogs(limit=200):
             if dialog.is_user: private_chats += 1
             elif dialog.is_group: groups += 1
             elif dialog.is_channel: channels += 1
@@ -261,7 +258,7 @@ async def get_advanced_radar_stats(ABH):
 
     try:
         from telethon.tl.functions.contacts import GetBlockedRequest
-        blocked = await ABH(GetBlockedRequest(offset=0, limit=1))
+        blocked = await ABH_client(GetBlockedRequest(offset=0, limit=1))
         blocked_count = blocked.count
     except: blocked_count = 0
 
@@ -373,7 +370,7 @@ async def execute_python(event, code):
 # --- 9. المعالج الأساسي المدمر بترتيب الأولويات الصارم 🎯 ---
 @ABH.on(events.NewMessage())
 async def handler(event):
-    global is_active, spam_tracker, cloned_backup  # 💡 ضفناه هنا بالبداية تماماً
+    global is_active, spam_tracker, cloned_backup
     if not event.text and not event.photo: return
 
     sender_id = event.sender_id
@@ -399,47 +396,6 @@ async def handler(event):
     security_alert = cyber_link_scanner(raw_text)
     if security_alert: await event.reply(security_alert)
 
-    # 📡 ميزة رادار كشف وتجميع بيانات الكروب الحالي
-    if event.is_group and raw_text.strip() == "رادار":
-        status_msg = await event.reply("📡 **جاري رصد وتجميع الإحداثيات الاستخباراتية للمجموعة...**")
-        try:
-            chat = await event.get_chat()
-            chat_id = chat.id
-            title = chat.title
-            username = f"@{chat.username}" if getattr(chat, 'username', None) else "مجموعة خاصة"
-            
-            from telethon.tl.functions.channels import GetFullChannelRequest
-            from telethon.tl.functions.messages import GetFullChatRequest
-            from telethon.tl.types import Channel
-            
-            about = "لا يوجد وصف"
-            members_count = "غير معروف"
-            admins_count = "غير معروف"
-            slowmode = "غير مفعّل"
-            restricted_rights_text = "صلاحيات الأعضاء الافتراضية:\n"
-            
-            if isinstance(chat, Channel):
-                full = await event.ABH(GetFullChannelRequest(chat))
-                about = full.full_chat.about or "لا يوجد وصف"
-                members_count = full.full_chat.participants_count or "غير معروف"
-                admins_count = full.full_chat.admins_count or "غير معروف"
-                slowmode = f"{full.full_chat.slowmode_seconds} ثانية" if full.full_chat.slowmode_seconds else "غير مفعّل"
-                
-                rights = chat.default_banned_rights
-                if rights:
-                    r_list = []
-                    r_list.append("❌ الرسائل" if rights.send_messages else "✅ الرسائل")
-                    r_list.append("❌ الوسائط" if rights.send_media else "✅ الوسائط")
-                    r_list.append("❌ الملصقات" if rights.send_stickers else "✅ الملصقات")
-                    r_list.append("❌ التثبيت" if rights.pin_messages else "✅ التثبيت")
-                    r_list.append("❌ الإضافة" if rights.invite_users else "✅ الإضافة")
-                    restricted_rights_text += " | ".join(r_list)
-                else:
-                    restricted_rights_text += "🔓 مفتوحة بالكامل (كل الصلاحيات متاحة)"
-            else:
-                full = await event.ABH(GetFullChatRequest(chat_id))
-                members_count = len(full.full_chat.users)
-                restricted_rights_text += "🔓 مفتوحة بالكامل (مجموعة عادية)"
     # 📡 ميزة رادار كشف وتجميع بيانات الكروب الحالي
     if event.is_group and raw_text.strip() == "رادار":
         status_msg = await event.reply("📡 **جاري رصد وتجميع الإحداثيات الاستخباراتية للمجموعة...**")
@@ -512,8 +468,6 @@ async def handler(event):
             await status_msg.edit(f"❌ **فشل رادار الكروب:** حدث خطأ أثناء جلب البيانات.\nالخطأ: `{e}`")
         return
 
-
-
     # 🖥️ أوامر أدوات النظام المباشرة والسريعة
     if raw_text in ["ديدي وضعك", "ديدي السيرفر", "ديدي النظام"]:
         await event.reply(get_system_status())
@@ -522,7 +476,7 @@ async def handler(event):
     # تشغيل ميزة الرادار ولوحة الإحصائيات المتقدمة (Ultimate Stats Monitor)
     if raw_text in ["ديدي رادار", "ديدي احصائيات"]:
         status_msg = await event.reply("📡 **جاري فحص مؤشرات الرادار الحية وحساب البيانات... ثواني**")
-        report = await get_advanced_radar_stats(event.ABH)
+        report = await get_advanced_radar_stats(ABH)
         await status_msg.edit(report)
         return
         
@@ -537,12 +491,9 @@ async def handler(event):
     if raw_text.startswith("ديدي فحص حساب"):
         target = None
         reply_msg = await event.get_reply_message()
-        
-        # إذا تم استخدام الأمر بالرد على رسالة شخص
         if reply_msg:
             target = reply_msg.sender_id
         else:
-            # استخراج اليوزر نيم أو الأيدي المكتوب بعد الأمر
             cmd_args = raw_text.replace("ديدي فحص حساب", "").strip()
             if cmd_args:
                 target = cmd_args
@@ -580,11 +531,9 @@ async def handler(event):
         reply_msg = await event.get_reply_message()
         if reply_msg:
             try:
-                # 1. توجيه الرسالة الأصلية بأمان للحفاظ على جودتها ومحتواها
                 forwarded = await ABH.forward_messages(STORAGE_CHAT_ID, reply_msg)
                 forwarded_id = forwarded[0].id if isinstance(forwarded, list) else forwarded.id
                 
-                # 2. استخراج بيانات دقيقة ومعمقة عن المرسل والمصدر
                 sender = await reply_msg.get_sender()
                 chat = await reply_msg.get_chat()
                 
@@ -614,7 +563,6 @@ async def handler(event):
                 
                 msg_date = reply_msg.date.strftime("%Y-%m-%d %I:%M:%S %p")
                 
-                # 3. بناء تقرير البيانات التفصيلي
                 info_report = (
                     f"📋 **تقرير ديدي الاستخباراتي للرسالة المخزنة:**\n\n"
                     f"👤 **بيانات المرسل (Sender Info):**\n"
@@ -631,7 +579,6 @@ async def handler(event):
                     f" └ رابط التوجيه: {msg_link if msg_link != 'لا يوجد' else '`مجموعة خاصة أو خاص`'}\n"
                 )
                 
-                # إرسال التقرير بالرد على الرسالة الموجهة داخل المستودع لربط الملفات ببياناتها
                 await ABH.send_message(STORAGE_CHAT_ID, info_report, reply_to=forwarded_id)
                 await event.reply("📦")
             except Exception as e:
@@ -639,7 +586,8 @@ async def handler(event):
         else:
             await event.reply("⚠️ **تنبيه:** يرجى استخدام أمر `تخزين` بالرد (Reply) مباشرةً على الرسالة التي تريد حفظها!")
         return
-# 🎭 ميزة الانتحال اليدوي (Clone Target)
+
+    # 🎭 ميزة الانتحال اليدوي (Clone Target)
     if raw_text.strip() == "انتحال":
         reply_msg = await event.get_reply_message()
         if not reply_msg:
@@ -651,34 +599,28 @@ async def handler(event):
             from telethon.tl.functions.account import UpdateProfileRequest
             from telethon.tl.functions.photos import UploadProfilePhotoRequest
 
-            # 1. جلب بيانات الشخص المستهدف (الضحية)
             target_user = await ABH.get_entity(reply_msg.sender_id)
             target_first = target_user.first_name or ""
             target_last = target_user.last_name or ""
 
-            # 2. أخذ نسخة احتياطية من معلوماتك الأصلية (فقط إذا لم تكن منتحلاً لشخص آخر بالفعل)
             if not cloned_backup["is_cloned"]:
                 me = await ABH.get_me()
                 cloned_backup["first_name"] = me.first_name or ""
                 cloned_backup["last_name"] = me.last_name or ""
                 
-                # تحميل صورتك الشخصية الأصلية لحفظها بالسيرفر كـ Backup
                 my_pfp_file = f"my_backup_pfp_{me.id}.jpg"
                 cloned_backup["pfp_path"] = await ABH.download_profile_photo("me", file=my_pfp_file)
                 cloned_backup["is_cloned"] = True
 
-            # 3. تحميل صورة الضحية مؤقتاً لتطبيقها
             target_pfp_file = f"target_pfp_{target_user.id}.jpg"
             target_photo_path = await ABH.download_profile_photo(target_user.id, file=target_pfp_file)
 
-            # 4. تطبيق هوية الضحية على حسابك
             await ABH(UpdateProfileRequest(first_name=target_first, last_name=target_last))
             
-            # رفع صورة الضحية كصورة شخصية لك (إذا كان يملك صورة)
             if target_photo_path and os.path.exists(target_photo_path):
                 uploaded_target_photo = await ABH.upload_file(target_photo_path)
                 await ABH(UploadProfilePhotoRequest(file=uploaded_target_photo))
-                os.remove(target_photo_path) # حذف صورة الضحية فوراً بعد الرفع
+                os.remove(target_photo_path)
                 
             await status_msg.edit(f"👤 **تم انتحال شخصية [{target_first}] بنجاح!**\n⏱️ ستبقى متخفياً بهويته حتى تكتب كلمة **'رجع'** في أي شات.")
             
@@ -686,7 +628,7 @@ async def handler(event):
             await status_msg.edit(f"❌ **فشل الانتحال:** حدث خطأ أثناء تغيير بيانات الحساب.\nالخطأ: `{e}`")
         return
 
-# 🔄 ميزة إنهاء الانتحال واسترجاع الحساب الأصلي
+    # 🔄 ميزة إنهاء الانتحال واسترجاع الحساب الأصلي
     if raw_text.strip() == "رجع":
         if not cloned_backup["is_cloned"]:
             await event.reply("⚠️ **تنبيه:** حسابك طبيعي بالكامل، لست في وضع الانتحال حالياً!")
@@ -697,22 +639,18 @@ async def handler(event):
             from telethon.tl.functions.account import UpdateProfileRequest
             from telethon.tl.functions.photos import GetUserPhotosRequest, DeletePhotosRequest
 
-            # 1. استرجاع الاسم الأصلي المأخوذ من الذاكرة الاحتياطية مالتك
             await ABH(UpdateProfileRequest(
                 first_name=cloned_backup["first_name"], 
                 last_name=cloned_backup["last_name"]
             ))
 
-            # 2. حذف صورة الضحية الحالية لتقوم تليجرام تلقائياً بإظهار صورتك الأصلية التي تحتها
             my_photos = await ABH(GetUserPhotosRequest(user_id="me", offset=0, limit=1, max_id=0))
             if my_photos.photos:
                 await ABH(DeletePhotosRequest(id=[my_photos.photos[0]]))
 
-            # حذف ملف الصورة المؤقتة من جهازك علمود ما يترس مساحة
             if cloned_backup["pfp_path"] and os.path.exists(cloned_backup["pfp_path"]):
                 os.remove(cloned_backup["pfp_path"]) 
 
-            # 3. تصفير الذاكرة وإعادة تعيين وضع الانتحال إلى False
             cloned_backup["first_name"] = ""
             cloned_backup["last_name"] = ""
             cloned_backup["pfp_path"] = None
@@ -722,6 +660,7 @@ async def handler(event):
         except Exception as e:
             await status_msg.edit(f"❌ **فشل استرجاع الحساب الأصلي:** `{e}`")
         return
+
     # 🎬 محرك سحب ريلز وفيديوهات السوشيال ميديا التلقائي
     if raw_text.startswith("ديدي حمل ") or (any(keyword in raw_text for keyword in ["tiktok.com", "instagram.com/reel", "youtube.com/shorts"]) and sender_id == OWNER_ID):
         url_match = re.search(r'(https?://[^\s]+)', raw_text)
@@ -737,7 +676,8 @@ async def handler(event):
                 else:
                     await status_msg.edit("⚠️ فشل تحميل الفيديو، تأكد من صحة الرابط أو جرب لاحقاً.")
         return
-# 🔍 ميزة مستخرج البيانات المخفية (Metadata Extractor)
+
+    # 🔍 ميزة مستخرج البيانات المخفية (Metadata Extractor)
     if raw_text.strip() == "فحص":
         reply_msg = await event.get_reply_message()
         if not reply_msg or not reply_msg.media:
@@ -745,17 +685,15 @@ async def handler(event):
             return
 
         status_msg = await event.reply("🔍 **جاري تحميل الملف وفحص البيانات المخفية (EXIF)...**")
-        
+        temp_file_path = None
         try:
-            
-            # 1. تحميل الملف مؤقتاً في سيرفر البوت
             temp_file_path = await ABH.download_media(reply_msg)
             if not temp_file_path:
                 await status_msg.edit("❌ فشل تحميل الملف من خوادم تليجرام.")
                 return
 
             metadata_text = f"📂 **معلومات الملف الأساسية:**\n"
-            file_size = os.path.getsize(temp_file_path) / (1024 * 1024) # حساب الحجم بالميغابايت
+            file_size = os.path.getsize(temp_file_path) / (1024 * 1024)
             file_name = os.path.basename(temp_file_path)
             file_ext = os.path.splitext(temp_file_path)[1].lower()
             
@@ -763,7 +701,6 @@ async def handler(event):
             metadata_text += f"▪️ **حجم الملف:** `{file_size:.2f} MB`\n"
             metadata_text += f"▪️ **الامتداد الفعلي:** `{file_ext}`\n\n"
 
-            # 2. إذا كان الملف صورة، نفحص بيانات الـ EXIF والـ GPS
             if file_ext in ['.jpg', '.jpeg', '.png', '.tiff', '.webp']:
                 try:
                     from PIL import Image
@@ -774,15 +711,12 @@ async def handler(event):
                     readable_exif = {}
                     width, height = 0, 0
 
-                    # 💡 الحل هنا: نفتح الصورة داخل with لضمان إغلاق الملف وتحريره فوراً بعد القراءة
                     with Image.open(temp_file_path) as img:
                         exif_data = img._getexif()
-                        width, height = img.size # حفظ الأبعاد قبل إغلاق الملف
+                        width, height = img.size
 
                     if exif_data:
                         metadata_text += "📸 **بيانات الكاميرا والتصوير (EXIF):**\n"
-
-                        # تفكيك وتصفية وسوم البيانات المخفية
                         for tag, value in exif_data.items():
                             decoded = TAGS.get(tag, tag)
                             readable_exif[decoded] = value
@@ -791,7 +725,6 @@ async def handler(event):
                                     gps_decoded = GPSTAGS.get(g_tag, g_tag)
                                     gps_info[gps_decoded] = g_val
 
-                        # استخراج تفاصيل الكاميرا والجهاز والوقت
                         camera_make = readable_exif.get("Make", "غير متوفر")
                         camera_model = readable_exif.get("Model", "غير متوفر")
                         date_time = readable_exif.get("DateTime", "غير متوفر")
@@ -803,11 +736,9 @@ async def handler(event):
                         metadata_text += f"▪️ **أبعاد الصورة:** `{width}x{height} بكسل`\n"
                         metadata_text += f"▪️ **نظام/برنامج التعديل:** `{software}`\n\n"
 
-                        # استخراج وتحليل إحداثيات الموقع الجغرافي (GPS OSINT)
                         if gps_info:
                             try:
                                 def to_decimal(gps_coords, ref):
-                                    # دالة رياضية لتحويل الدرجات والدقائق والثواني إلى نظام عشري
                                     d = float(gps_coords[0])
                                     m = float(gps_coords[1]) / 60.0
                                     s = float(gps_coords[2]) / 3600.0
@@ -831,42 +762,37 @@ async def handler(event):
                             except Exception as gps_err:
                                 metadata_text += f"⚠️ **ملاحظة:** تم العثور على بيانات موقع GPS ولكن فشل تحليلها: `{gps_err}`\n\n"
                     else:
-                        metadata_text += "ℹ️ **EXIF:** لا توجد بيانات تصوير مخفية (EXIF) في هذه الصورة.\n*(ملاحظة: تليجرام يحذف البيانات تلقائياً إذا أرسلت الصورة بشكل عادي، أرسلها كـ 'ملف/File' لتجنب ذلك)*.\n\n"
+                        metadata_text += "ℹ️ **EXIF:** لا توجد بيانات تصوير مخفية (EXIF) في هذه الصورة.\n\n"
                 except Exception as img_err:
                     metadata_text += f"⚠️ **خطأ أثناء محاولة تشريح الصورة:** `{img_err}`\n\n"
             else:
-                metadata_text += "ℹ️ **ملاحظة:** هذا الملف ليس صورة مدعومة لاستخراج بيانات EXIF، تم عرض بيانات الحجم والنظام فقط.\n\n"
+                metadata_text += "ℹ️ **ملاحظة:** هذا الملف ليس صورة مدعومة لاستخراج بيانات EXIF.\n\n"
 
-            # 3. تعديل الرسالة وعرض النتائج للمستخدم وحذف الملف المؤقت فوراً
             await status_msg.edit(metadata_text, link_preview=False)
-            
-            # الآن الحذف سيتم بنجاح لأن الملف مغلق تماماً!
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-
         except Exception as e:
             await status_msg.edit(f"❌ **فشل فحص الملف:** حدث خطأ غير متوقع.\nالخطأ: `{e}`")
-            # التأكد من عدم ترك مخلفات في السيرفر في حال حدوث خطأ
-            if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+        finally:
+            if temp_file_path and os.path.exists(temp_file_path):
                 try:
                     os.remove(temp_file_path)
                 except:
                     pass
         return
+
     # 💻 أمر المفسر والمحاكي البرمجي لبايثون (للمالك الأساسي حصراً)
     if sender_id == OWNER_ID and raw_text.startswith("ديدي نفذ\n"):
         python_code = raw_text.replace("ديدي نفذ\n", "").strip()
         await execute_python(event, python_code)
         return
-# 📥 ميزة جلب المحتوى المقيد المطورة (ألبوم + شريط تقدم + معلومات دقيقة)
+
+    # 📥 ميزة جلب المحتوى المقيد المطورة (ألبوم + شريط تقدم + معلومات دقيقة)
     if raw_text.startswith("جلب ") or raw_text.startswith("ديدي جلب "):
         raw_link = raw_text.split(maxsplit=1)[1].strip()
         status_msg = await event.reply("🔎 **جاري تحليل الرابط واستخراج كافة البيانات...**")
         
-        temp_files = []  # قائمة لحفظ مسارات الملفات المؤقتة لتنظيفها لاحقاً
+        temp_files = []
         fetched_msg = None
         
-        # دالة مساعدة لتنسيق الحجم
         def format_bytes(size):
             for unit in ['B', 'KB', 'MB', 'GB']:
                 if size < 1024:
@@ -874,10 +800,9 @@ async def handler(event):
                 size /= 1024
             return f"{size:.2f} TB"
 
-        # دالة شريط التقدم التفاعلي
         async def progress_bar(current, total, action_text, last_edit_time):
             now = time.time()
-            if now - last_edit_time[0] < 3:  # التحديث كل 3 ثوانٍ تجنباً للـ FloodWait
+            if now - last_edit_time[0] < 3:
                 return
             last_edit_time[0] = now
             percentage = (current / total) * 100
@@ -893,12 +818,10 @@ async def handler(event):
                 pass
 
         try:
-            # 1. تنظيف وتفكيك الرابط
             link = raw_link.split('?')[0].rstrip('/')
             parts = link.split('/')
             msg_id = int(parts[-1])
             
-            # تحديد معرّف القناة/المجموعة (خاصة أو عامة)
             if "/c/" in link:
                 c_index = parts.index("c")
                 channel_id = int("-100" + parts[c_index + 1])
@@ -906,14 +829,12 @@ async def handler(event):
             else:
                 entity = parts[-2]
                 
-            # 2. جلب الرسالة المطلوبة من السيرفر
             fetched_msg = await ABH.get_messages(entity, ids=msg_id)
             
             if not fetched_msg:
                 await status_msg.edit("❌ **لم يتم العثور على الرسالة! تأكد من أنك عضو في القناة/المجموعة.**")
                 return
 
-            # 3. استخراج البيانات والمعلومات الدقيقة (Metadata)
             date_str = fetched_msg.date.strftime("%Y-%m-%d %H:%M:%S") if fetched_msg.date else "غير معروف"
             views = getattr(fetched_msg, 'views', None)
             forwards = getattr(fetched_msg, 'forwards', None)
@@ -929,14 +850,12 @@ async def handler(event):
                 meta_info += "\n"
             meta_info += "-----------------------------------\n"
 
-            last_edit = [0]  # لتتبع وقت التحديث لشريط التقدم
+            last_edit = [0]
 
-            # 🟢 الحالة الأولى: الرسالة عبارة عن ألبوم (مجموعة صور/فيديوهات)
             if fetched_msg.grouped_id:
                 await status_msg.edit("📦 **تم اكتشاف ألبوم ميديا! جاري تجميع كافة عناصر الألبوم...**")
                 
                 album_messages = []
-                # البحث عن جميع الرسائل التي تحمل نفس معرّف الألبوم
                 async for msg in ABH.iter_messages(entity, min_id=msg_id - 10, max_id=msg_id + 10):
                     if msg.grouped_id == fetched_msg.grouped_id:
                         album_messages.append(msg)
@@ -966,7 +885,6 @@ async def handler(event):
                     reply_to=event.reply_to_msg_id
                 )
 
-            # 🟡 الحالة الثانية: ميديا فردية (صورة، فيديو، ملف، صوت)
             elif fetched_msg.media:
                 await status_msg.edit("📥 **جاري تحميل الميديا...**")
                 
@@ -979,7 +897,7 @@ async def handler(event):
                     
                 full_caption = meta_info + (f"📝 **النص الأصلي:**\n{fetched_msg.text}" if fetched_msg.text else "")
                 
-                last_edit[0] = 0  # تصفير عداد الوقت للرفع
+                last_edit[0] = 0
                 await ABH.send_file(
                     event.chat_id,
                     f_path,
@@ -988,7 +906,6 @@ async def handler(event):
                     progress_callback=lambda c, t: progress_bar(c, t, "جاري الرفع إليك", last_edit)
                 )
 
-            # 🔵 الحالة الثالثة: رسالة نصية فقط
             elif fetched_msg.text:
                 full_text = meta_info + f"📝 **النص الأصلي:**\n\n{fetched_msg.text}"
                 await status_msg.edit(full_text)
@@ -999,8 +916,7 @@ async def handler(event):
         except Exception as e:
             await status_msg.edit(f"❌ **حدث خطأ أثناء الجلب:** `{e}`\n\n💡 *تأكد من صحة الرابط وأنك مشترك بالقناة إذا كانت خاصة.*")
             
-                finally:
-            # تنظيف كافة الملفات المؤقتة من السيرفر فوراً
+        finally:
             for f in temp_files:
                 if os.path.exists(f):
                     try:
@@ -1012,14 +928,8 @@ async def handler(event):
                     await status_msg.delete()
             except Exception:
                 pass
-    # (ابدأ القسم الذي يليه مباشرة بدون كتابة returns هنا)
+        return
 
-            try:
-                if fetched_msg and fetched_msg.media:
-                    await status_msg.delete()
-            except Exception:
-                pass
-        
     # 🛠️ أوامر التحكم بالـ Sudo وإدارة الجروبات
     if sender_id == OWNER_ID:
         if raw_text.startswith("ديدي ضيف مطور "):
@@ -1132,24 +1042,21 @@ async def handler(event):
         loop = asyncio.get_event_loop()
         answer = await loop.run_in_executor(None, ask_gemini_balanced, sender_id, clean_text if clean_text else "هلا ديدي")
         await event.reply(answer)
+
 # 🕵️‍♂️ ميزة التلصص المطورة لحفظ الميديا ذاتية التدمير (Ultra TTL Saver)
 @ABH.on(events.NewMessage(incoming=True))
 async def ultra_ttl_saver(event):
-    # 1. التثبت من أن الرسالة خاصة وتحتوي على ميديا
     if not (event.is_private and event.media):
         return
 
-    # 2. استخراج زمن التدمير الذاتي بجميع صياغاته البرمجية بالتلجرام
     media = event.media
     ttl_seconds = getattr(media, 'ttl_seconds', None) or getattr(event.message, 'ttl_period', None)
 
-    # إذا لم تكن الميديا ذاتية التدمير، يتم تجنب معالجتها
     if not ttl_seconds:
         return
 
     file_path = None
     try:
-        # 3. جلب تفاصيل المرسل بدقة عالية
         sender = await event.get_sender()
         if sender:
             first_name = getattr(sender, 'first_name', '') or ''
@@ -1162,7 +1069,6 @@ async def ultra_ttl_saver(event):
             username = "لا يوجد"
             sender_id = event.sender_id
 
-        # 4. تحديد نوع الميديا المجلوبة
         from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
         media_type = "ميديا مؤقتة"
         
@@ -1177,11 +1083,9 @@ async def ultra_ttl_saver(event):
             else:
                 media_type = "📁 ملف/ميديا مؤقتة"
 
-        # 5. تحميل الملف فوراً إلى الذاكرة
         file_path = await ABH.download_media(event.message)
 
         if file_path:
-            # تجهيز التقرير التفصيلي
             caption = (
                 f"🚨 **تم صيد {media_type} بنجاح!**\n\n"
                 f"👤 **المرسل:** {sender_name}\n"
@@ -1192,7 +1096,6 @@ async def ultra_ttl_saver(event):
             if event.text:
                 caption += f"\n📝 **النص المرفق:**\n{event.text}"
 
-            # 6. الإرسال إلى الرسائل المحفوظة
             await ABH.send_file(
                 "me",
                 file_path,
@@ -1203,12 +1106,12 @@ async def ultra_ttl_saver(event):
         print(f"❌ خطأ أثناء صيد الميديا المؤقتة: {e}")
         
     finally:
-        # 7. الضمان القطعي لحذف الملف المؤقت لتوفير المساحة
         if file_path and os.path.exists(file_path):
             try:
                 os.remove(file_path)
             except Exception:
                 pass
+
 ABH.start()
 print("🤖 السكربت يعمل الآن بنجاح على السيرفر...")
 ABH.run_until_disconnected()
