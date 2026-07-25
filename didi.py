@@ -9,7 +9,7 @@ import sys
 import io
 import base64
 import json
-import request
+import requests
 import psutil  
 import yt_dlp
 import socket
