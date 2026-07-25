@@ -461,30 +461,9 @@ async def delete_last_photo(e):
         await e.delete()
     except Exception as ex:
         await e.edit(f"❌ حدث خطأ أثناء حذف الصورة:\n`{ex}`")
-@ABH.on(events.NewMessage(pattern=r'^منصب؟$', from_users=1910015590))
-async def check_admin(event):
-    me = await ABH.get_me()
-    id = me.id
-    if id == 1910015590:
-        return
-    r = await event.get_reply_message()
-    if not r:
-        return
-    if r.id == wfffp:
-        return
-    await event.reply("نعم، أنا منصب هنا.")
-@ABH.on(events.NewMessage(pattern=r'^منو تاج راسك؟$', from_users=1910015590))
+@ABH.on(events.NewMessage(pattern=r'^(منو تاج راسك؟|منصب؟)$', from_users=1910015590, incoming=True))
 async def asc(event):
-    me = await ABH.get_me()
-    id = me.id
-    if id == 1910015590:
-        return
-    r = await event.get_reply_message()
-    if not r:
-        return
-    if r.id == wfffp:
-        return
-    await event.reply("الامام علي.")
+    await event.reply("الامام علي." if e.text == "منو تاج راسك؟" else 'نعم')
 @ABH.on(events.NewMessage(pattern='^بلوك$', outgoing=True))
 async def block(event):
     if event.is_private:
@@ -587,32 +566,3 @@ async def my_info(event):
 📩 رسائل الكروبات غير المقروءة : {unread_groups}
 """
     await event.edit(text)
-@ABH.on(events.NewMessage(pattern="مزامنة", outgoing=True))
-async def _(e):
-    chat = -1002116581783
-    success_count = 0
-    failed_count = 0
-    incomplete_count = 0
-    total = 0
-    status_msg = await e.respond("🔄 جاري بدء المزامنة...")
-    for id in range(70, 466):
-        total += 1
-        try:
-            msg = await ABH.get_messages(chat, ids=id)
-            if msg:
-                await e.respond(f"رياكت https://t.me/x04ou/{id}")
-                success_count += 1
-            else:
-                incomplete_count += 1
-            await asyncio.sleep(10)
-        except Exception as err:
-            failed_count += 1
-            print(f"خطأ في المعرف {id}: {err}")
-            continue
-    summary = (
-        "📊 **إحصائيات العملية**\n\n"
-        f"✅ الناجحة: {success_count}\n"
-        f"❌ الفاشلة: {failed_count}\n"
-        f"⚠️ غير مكتملة: {incomplete_count}\n"
-        f"📌 الإجمالي: {total}")
-    await status_msg.edit(summary)
