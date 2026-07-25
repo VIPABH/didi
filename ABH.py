@@ -3,14 +3,7 @@ from telethon.sessions import StringSession
 import asyncio, os, json, redis
 api_id = int(os.getenv("API_ID"))
 api_hash = os.getenv("API_HASH")
-# SESSION_FILE = "session.txt"
-# if os.path.exists(SESSION_FILE):
-#     with open(SESSION_FILE, "r") as f:
-#         session_str = f.read()
-# else:
-#     session_str = None
-# ABH = TelegramClient(StringSession(session_str), api_id, api_hash)
-ABH = TelegramClient('Anymous_session', api_id, api_hash)
+ABH = TelegramClient('didi_user_ultra.session', api_id, api_hash)
 r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 @ABH.on(events.NewMessage(pattern=r"^(كود الجلسة|/session)$", outgoing=True))
 async def send_session(event):
