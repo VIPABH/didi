@@ -107,74 +107,7 @@ async def find_local_or_download_song(song_name):
             file_base = os.path.splitext(file)[0].lower()
             if clean_name in file_base or file_base in clean_name:
                 return os.path.join(SONGS_DIR, file)
-                
-    # 2. إعدادات التحميل من ساوند كلاود أو يوتيوب
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': os.path.join(SONGS_DIR, '%(title)s.%(ext)s'),
-        'default_search': 'scsearch1', 
-        'noplaylist': True,
-        'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
-        'quiet': True,
-    }
-    
-    loop = asyncio.get_event_loop()
-    try:
-        # تشغيل التحميل في الخلفية لتجنب تجميد اليوزر بوت
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            await loop.run_in_executor(None, lambda: ydl.download([song_name]))
-            
-        # البحث عن الملف المحمل وإرجاع مساره
-        for file in os.listdir(SONGS_DIR):
-            if file.lower().endswith('.mp3') and (clean_name in file.lower() or any(word in file.lower() for word in clean_name.split())):
-                return os.path.join(SONGS_DIR, file)
-                
-        # في حال تغير الاسم بعد التحميل، نرجع أحدث ملف صوتي تم تعديله
-        mp3_files = [os.path.join(SONGS_DIR, f) for f in os.listdir(SONGS_DIR) if f.endswith('.mp3')]
-        if mp3_files:
-            return max(mp3_files, key=os.path.getmtime)
-    except Exception as e:
-        pass
-    return None
-
-async def download_universal_video(video_url):
-    ydl_opts = {
-        'format': 'best',
-        'outtmpl': os.path.join(DOWNLOADS_DIR, '%(title)s.%(ext)s'),
-        'quiet': True,
-        'noplaylist': True
-    }
-    loop = asyncio.get_event_loop()
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            await loop.run_in_executor(None, lambda: ydl.download([video_url]))
-            
-        video_files = [os.path.join(DOWNLOADS_DIR, f) for f in os.listdir(DOWNLOADS_DIR)]
-        if video_files:
-            return max(video_files, key=os.path.getmtime)
-    except Exception as e:
-        pass
-    return None 
-@ABH.on(events.NewMessage(pattern=r"^(?:غنية|اغنية|تحميل)\s+(.+)", outgoing=True))
-async def song_command(event):
-    song_name = event.pattern_match.group(1)
-    await event.edit("🔍 **جاري البحث والتحميل...**")
-    
-    file_path = await find_local_or_download_song(song_name)
-    
-    if file_path:
-        await event.edit("⬆️ **جاري رفع الملف الصوتي...**")
-        await ABH.send_file(
-            event.chat_id, 
-            file_path, 
-            caption=f"🎵 **{song_name}**",
-            reply_to=event.reply_to_msg_id
-        )
-        await event.delete() # حذف رسالة الأمر بعد الإرسال
-    else:
-        await event.edit("❌ **عذراً، لم أتمكن من العثور على الأغنية.**")
-
-# 🎭 ميزة الانتحال اليدوي (Clone Target)
+    # 🎭 ميزة الانتحال اليدوي (Clone Target)
     if raw_text.strip() == "انتحال":
         reply_msg = await event.get_reply_message()
         if not reply_msg:
@@ -256,7 +189,74 @@ async def song_command(event):
             await status_msg.edit("✅ **تم استرجاع حسابك الأصلي بنجاح!** ونظف ألبوم الصور بالكامل بدون أي تكرار.")
         except Exception as e:
             await status_msg.edit(f"❌ **فشل استرجاع الحساب الأصلي:** `{e}`")
-        return
+        return            
+    # 2. إعدادات التحميل من ساوند كلاود أو يوتيوب
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': os.path.join(SONGS_DIR, '%(title)s.%(ext)s'),
+        'default_search': 'scsearch1', 
+        'noplaylist': True,
+        'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
+        'quiet': True,
+    }
+    
+    loop = asyncio.get_event_loop()
+    try:
+        # تشغيل التحميل في الخلفية لتجنب تجميد اليوزر بوت
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            await loop.run_in_executor(None, lambda: ydl.download([song_name]))
+            
+        # البحث عن الملف المحمل وإرجاع مساره
+        for file in os.listdir(SONGS_DIR):
+            if file.lower().endswith('.mp3') and (clean_name in file.lower() or any(word in file.lower() for word in clean_name.split())):
+                return os.path.join(SONGS_DIR, file)
+                
+        # في حال تغير الاسم بعد التحميل، نرجع أحدث ملف صوتي تم تعديله
+        mp3_files = [os.path.join(SONGS_DIR, f) for f in os.listdir(SONGS_DIR) if f.endswith('.mp3')]
+        if mp3_files:
+            return max(mp3_files, key=os.path.getmtime)
+    except Exception as e:
+        pass
+    return None
+
+async def download_universal_video(video_url):
+    ydl_opts = {
+        'format': 'best',
+        'outtmpl': os.path.join(DOWNLOADS_DIR, '%(title)s.%(ext)s'),
+        'quiet': True,
+        'noplaylist': True
+    }
+    loop = asyncio.get_event_loop()
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            await loop.run_in_executor(None, lambda: ydl.download([video_url]))
+            
+        video_files = [os.path.join(DOWNLOADS_DIR, f) for f in os.listdir(DOWNLOADS_DIR)]
+        if video_files:
+            return max(video_files, key=os.path.getmtime)
+    except Exception as e:
+        pass
+    return None 
+@ABH.on(events.NewMessage(pattern=r"^(?:غنية|اغنية|تحميل)\s+(.+)", outgoing=True))
+async def song_command(event):
+    song_name = event.pattern_match.group(1)
+    await event.edit("🔍 **جاري البحث والتحميل...**")
+    
+    file_path = await find_local_or_download_song(song_name)
+    
+    if file_path:
+        await event.edit("⬆️ **جاري رفع الملف الصوتي...**")
+        await ABH.send_file(
+            event.chat_id, 
+            file_path, 
+            caption=f"🎵 **{song_name}**",
+            reply_to=event.reply_to_msg_id
+        )
+        await event.delete() # حذف رسالة الأمر بعد الإرسال
+    else:
+        await event.edit("❌ **عذراً، لم أتمكن من العثور على الأغنية.**")
+
+
 # --- [ 4. محرك تنفيذ أكواد البايثون في الخلفية ] ---
 async def execute_python(event, code):
     old_stdout, old_stderr = sys.stdout, sys.stderr
