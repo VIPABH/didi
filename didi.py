@@ -1,5 +1,6 @@
 from telethon.tl.types import DocumentAttributeAudio  
-from ABH import *  
+from ABH import ABH
+from telethon import events  
 from datetime import datetime
 import asyncio
 import re
