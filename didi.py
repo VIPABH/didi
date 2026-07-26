@@ -1,6 +1,9 @@
 import asyncio, os, sys, io, yt_dlp, sqlite3, re
 from datetime import datetime
 from telethon import events
+from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon.tl.functions.messages import GetFullChatRequest
+from telethon.tl.types import Channel
 from ABH import ABH استيراد العميل الصحيح من ملف الاتصال
 
 # --- [ 1. المتغيرات العامة وقواعد البيانات المؤقتة ] ---
