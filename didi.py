@@ -14,7 +14,7 @@ import psutil
 import yt_dlp
 import socket
 import sqlite3
-
+from telethon import TelegramClient
 OWNER_ID = 1247061935  
 
 # 🆔 تم تحديث أيدي مجموعة التخزين الخاصة بك بنجاح هنا
