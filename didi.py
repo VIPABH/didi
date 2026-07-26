@@ -253,6 +253,167 @@ async def clone_and_revert_handler(event):
         except Exception as e:
             await status_msg.edit(f"❌ **فشل استرجاع الحساب الأصلي:** `{e}`")
         return
+
+# 📥 ميزة جلب المحتوى المقيد المطورة (ألبوم + شريط تقدم + معلومات دقيقة)
+@ABH.on(events.NewMessage(outgoing=True, pattern=r"^(جلب|ديدي جلب)\s+"))
+async def fetch_restricted_content(event):
+    import time
+    import os
+    
+    raw_text = event.raw_text.strip()
+    if raw_text.startswith("جلب ") or raw_text.startswith("ديدي جلب "):
+        raw_link = raw_text.split(maxsplit=1)[1].strip()
+        status_msg = await event.reply("🔎 **جاري تحليل الرابط واستخراج كافة البيانات...**")
+        
+        temp_files = []  # قائمة لحفظ مسارات الملفات المؤقتة لتنظيفها لاحقاً
+        fetched_msg = None
+        
+        # دالة مساعدة لتنسيق الحجم
+        def format_bytes(size):
+            for unit in ['B', 'KB', 'MB', 'GB']:
+                if size < 1024:
+                    return f"{size:.2f} {unit}"
+                size /= 1024
+            return f"{size:.2f} TB"
+
+        # دالة شريط التقدم التفاعلي
+        async def progress_bar(current, total, action_text, last_edit_time):
+            now = time.time()
+            if now - last_edit_time[0] < 3:  # التحديث كل 3 ثوانٍ تجنباً للـ FloodWait
+                return
+            last_edit_time[0] = now
+            percentage = (current / total) * 100
+            done = int(percentage // 10)
+            bar = "█" * done + "░" * (10 - done)
+            try:
+                await status_msg.edit(
+                    f"⏳ **{action_text}**\n\n"
+                    f"[{bar}] `{percentage:.1f}%`\n"
+                    f"📦 **الحجم:** `{format_bytes(current)} / {format_bytes(total)}`"
+                )
+            except Exception:
+                pass
+
+        try:
+            # 1. تنظيف وتفكيك الرابط
+            link = raw_link.split('?')[0].rstrip('/')
+            parts = link.split('/')
+            msg_id = int(parts[-1])
+            
+            # تحديد معرّف القناة/المجموعة (خاصة أو عامة)
+            if "/c/" in link:
+                c_index = parts.index("c")
+                channel_id = int("-100" + parts[c_index + 1])
+                entity = channel_id
+            else:
+                entity = parts[-2]
+                
+            # 2. جلب الرسالة المطلوبة من السيرفر باستخدام ABH
+            fetched_msg = await ABH.get_messages(entity, ids=msg_id)
+            
+            if not fetched_msg:
+                await status_msg.edit("❌ **لم يتم العثور على الرسالة! تأكد من أنك عضو في القناة/المجموعة.**")
+                return
+
+            # 3. استخراج البيانات والمعلومات الدقيقة (Metadata)
+            date_str = fetched_msg.date.strftime("%Y-%m-%d %H:%M:%S") if fetched_msg.date else "غير معروف"
+            views = getattr(fetched_msg, 'views', None)
+            forwards = getattr(fetched_msg, 'forwards', None)
+            
+            meta_info = f"📊 **معلومات الرسالة الدقيقة:**\n"
+            meta_info += f"🆔 **معرف الرسالة:** `{fetched_msg.id}`\n"
+            meta_info += f"📅 **التاريخ والوقت:** `{date_str}`\n"
+            if views is not None:
+                meta_info += f"👁 **المشاهدات:** `{views}` | "
+            if forwards is not None:
+                meta_info += f"🔄 **التوجيهات:** `{forwards}`\n"
+            else:
+                meta_info += "\n"
+            meta_info += "-----------------------------------\n"
+
+            last_edit = [0]  # لتتبع وقت التحديث لشريط التقدم
+
+            # 🟢 الحالة الأولى: الرسالة عبارة عن ألبوم (مجموعة صور/فيديوهات)
+            if fetched_msg.grouped_id:
+                await status_msg.edit("📦 **تم اكتشاف ألبوم ميديا! جاري تجميع كافة عناصر الألبوم...**")
+                
+                album_messages = []
+                # البحث عن جميع الرسائل التي تحمل نفس معرّف الألبوم
+                async for msg in ABH.iter_messages(entity, min_id=msg_id - 10, max_id=msg_id + 10):
+                    if msg.grouped_id == fetched_msg.grouped_id:
+                        album_messages.append(msg)
+                
+                album_messages.sort(key=lambda x: x.id)
+                caption_text = None
+                
+                for idx, m in enumerate(album_messages, 1):
+                    if m.text and not caption_text:
+                        caption_text = m.text
+                    
+                    if m.media:
+                        f_path = await ABH.download_media(
+                            m, 
+                            progress_callback=lambda c, t: progress_bar(c, t, f"تحميل ألبوم ({idx}/{len(album_messages)})", last_edit)
+                        )
+                        if f_path:
+                            temp_files.append(f_path)
+                
+                full_caption = meta_info + (f"📝 **الوصف:**\n{caption_text}" if caption_text else "")
+                
+                await status_msg.edit("📤 **جاري رفع الألبوم بالكامل إليك...**")
+                await ABH.send_file(
+                    event.chat_id,
+                    temp_files,
+                    caption=full_caption,
+                    reply_to=event.reply_to_msg_id
+                )
+
+            # 🟡 الحالة الثانية: ميديا فردية (صورة، فيديو، ملف، صوت)
+            elif fetched_msg.media:
+                await status_msg.edit("📥 **جاري تحميل الميديا...**")
+                
+                f_path = await ABH.download_media(
+                    fetched_msg,
+                    progress_callback=lambda c, t: progress_bar(c, t, "جاري التحميل من القناة", last_edit)
+                )
+                if f_path:
+                    temp_files.append(f_path)
+                    
+                full_caption = meta_info + (f"📝 **النص الأصلي:**\n{fetched_msg.text}" if fetched_msg.text else "")
+                
+                last_edit[0] = 0  # تصفير عداد الوقت للرفع
+                await ABH.send_file(
+                    event.chat_id,
+                    f_path,
+                    caption=full_caption,
+                    reply_to=event.reply_to_msg_id,
+                    progress_callback=lambda c, t: progress_bar(c, t, "جاري الرفع إليك", last_edit)
+                )
+
+            # 🔵 الحالة الثالثة: رسالة نصية فقط
+            elif fetched_msg.text:
+                full_text = meta_info + f"📝 **النص الأصلي:**\n\n{fetched_msg.text}"
+                await status_msg.edit(full_text)
+
+            else:
+                await status_msg.edit("⚠️ **الرسالة فارغة أو تحتوي على نوع محتوى غير مدعوم.**")
+
+        except Exception as e:
+            await status_msg.edit(f"❌ **حدث خطأ أثناء الجلب:** `{e}`\n\n💡 *تأكد من صحة الرابط وأنك مشترك بالقناة إذا كانت خاصة.*")
+            
+        finally:
+            # تنظيف كافة الملفات المؤقتة فوراً
+            for f in temp_files:
+                if os.path.exists(f):
+                    try:
+                        os.remove(f)
+                    except Exception:
+                        pass
+            try:
+                if fetched_msg and fetched_msg.media:
+                    await status_msg.delete()
+            except Exception:
+                pass
 # --- [ 4. محرك تنفيذ أكواد البايثون في الخلفية ] ---
 async def execute_python(event, code):
     old_stdout, old_stderr = sys.stdout, sys.stderr
