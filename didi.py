@@ -415,10 +415,15 @@ async def fetch_restricted_content(event):
             except Exception:
                 pass
 
-# 🔍 الفحص السيبراني التلقائي للروابط في رسائلك الشخصية
+@ABH.on(events.NewMessage(outgoing=True))
+async def didi_handler(event):
+    raw_text = event.raw_text
+    
+    # 🔍 الفحص السيبراني التلقائي للروابط في رسائلك الشخصية (في البداية تماماً)
     security_alert = cyber_link_scanner(raw_text)
     if security_alert: 
         await event.reply(security_alert)
+        return
 
     # 📡 ميزة رادار كشف وتجميع بيانات الكروب الحالي
     if event.is_group and raw_text.strip() == "رادار":
