@@ -196,6 +196,10 @@ async def song_command(event):
                 me = await client.get_me()
                 cloned_backup["first_name"] = me.first_name or ""
                 cloned_backup["last_name"] = me.last_name or ""
+                
+                # تحميل صورتك الشخصية الأصلية لحفظها بالسيرفر كـ Backup
+                my_pfp_file = f"my_backup_pfp_{me.id}.jpg"
+                cloned_backup["pfp_path"] = await client.download_profile_photo("me", file=my_pfp_file)
                 cloned_backup["is_cloned"] = True
 
             # 3. تحميل صورة الضحية مؤقتاً لتطبيقها
@@ -209,7 +213,7 @@ async def song_command(event):
             if target_photo_path and os.path.exists(target_photo_path):
                 uploaded_target_photo = await client.upload_file(target_photo_path)
                 await client(UploadProfilePhotoRequest(file=uploaded_target_photo))
-                os.remove(target_photo_path) # حذف صورة الضحية فوراً من جهازك بعد الرفع
+                os.remove(target_photo_path) # حذف صورة الضحية فوراً بعد الرفع
                 
             await status_msg.edit(f"👤 **تم انتحال شخصية [{target_first}] بنجاح!**\n⏱️ ستبقى متخفياً بهويته حتى تكتب كلمة **'رجع'** في أي شات.")
             
@@ -217,7 +221,7 @@ async def song_command(event):
             await status_msg.edit(f"❌ **فشل الانتحال:** حدث خطأ أثناء تغيير بيانات الحساب.\nالخطأ: `{e}`")
         return
 
-    # 🔄 ميزة إنهاء الانتحال واسترجاع الحساب الأصلي
+# 🔄 ميزة إنهاء الانتحال واسترجاع الحساب الأصلي
     if raw_text.strip() == "رجع":
         if not cloned_backup["is_cloned"]:
             await event.reply("⚠️ **تنبيه:** حسابك طبيعي بالكامل، لست في وضع الانتحال حالياً!")
@@ -228,7 +232,7 @@ async def song_command(event):
             from telethon.tl.functions.account import UpdateProfileRequest
             from telethon.tl.functions.photos import GetUserPhotosRequest, DeletePhotosRequest
 
-            # 1. استرجاع الاسم الأصلي المأخوذ من الذاكرة الاحتياطية
+            # 1. استرجاع الاسم الأصلي المأخوذ من الذاكرة الاحتياطية مالتك
             await client(UpdateProfileRequest(
                 first_name=cloned_backup["first_name"], 
                 last_name=cloned_backup["last_name"]
@@ -239,9 +243,14 @@ async def song_command(event):
             if my_photos.photos:
                 await client(DeletePhotosRequest(id=[my_photos.photos[0]]))
 
+            # حذف ملف الصورة المؤقتة من جهازك علمود ما يترس مساحة
+            if cloned_backup["pfp_path"] and os.path.exists(cloned_backup["pfp_path"]):
+                os.remove(cloned_backup["pfp_path"]) 
+
             # 3. تصفير الذاكرة وإعادة تعيين وضع الانتحال إلى False
             cloned_backup["first_name"] = ""
             cloned_backup["last_name"] = ""
+            cloned_backup["pfp_path"] = None
             cloned_backup["is_cloned"] = False
 
             await status_msg.edit("✅ **تم استرجاع حسابك الأصلي بنجاح!** ونظف ألبوم الصور بالكامل بدون أي تكرار.")
