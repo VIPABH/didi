@@ -6,7 +6,7 @@ from التخزين import *
 from ذاتية import *
 from الميمز import *
 from بوتات import *
-#from didi import *
+from didi import *
 @ABH.on(events.NewMessage(pattern="^اطفاء$", from_users=[1910015590], outgoing=True))
 async def shutdown(event):
     await event.reply("🔴 جارٍ إيقاف اليوزربوت ...")
