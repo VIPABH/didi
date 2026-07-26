@@ -414,6 +414,146 @@ async def fetch_restricted_content(event):
                     await status_msg.delete()
             except Exception:
                 pass
+
+# 🔍 الفحص السيبراني التلقائي للروابط في رسائلك الشخصية
+    security_alert = cyber_link_scanner(raw_text)
+    if security_alert: 
+        await event.reply(security_alert)
+
+    # 📡 ميزة رادار كشف وتجميع بيانات الكروب الحالي
+    if event.is_group and raw_text.strip() == "رادار":
+        status_msg = await event.reply("📡 **جاري رصد وتجميع الإحداثيات الاستخباراتية للمجموعة...**")
+        try:
+            chat = await event.get_chat()
+            chat_id = chat.id
+            title = chat.title
+            username = f"@{chat.username}" if getattr(chat, 'username', None) else "مجموعة خاصة"
+            
+            from telethon.tl.functions.channels import GetFullChannelRequest
+            from telethon.tl.functions.messages import GetFullChatRequest
+            from telethon.tl.types import Channel
+            
+            about = "لا يوجد وصف"
+            members_count = "غير معروف"
+            admins_count = "غير معروف"
+            slowmode = "غير مفعّل"
+            restricted_rights_text = "صلاحيات الأعضاء الافتراضية:\n"
+            
+            if isinstance(chat, Channel):
+                full = await ABH(GetFullChannelRequest(chat))
+                about = full.full_chat.about or "لا يوجد وصف"
+                members_count = full.full_chat.participants_count or "غير معروف"
+                admins_count = full.full_chat.admins_count or "غير معروف"
+                slowmode = f"{full.full_chat.slowmode_seconds} ثانية" if full.full_chat.slowmode_seconds else "غير مفعّل"
+                
+                rights = chat.default_banned_rights
+                if rights:
+                    r_list = []
+                    r_list.append("❌ الرسائل" if rights.send_messages else "✅ الرسائل")
+                    r_list.append("❌ الوسائط" if rights.send_media else "✅ الوسائط")
+                    r_list.append("❌ الملصقات" if rights.send_stickers else "✅ الملصقات")
+                    r_list.append("❌ التثبيت" if rights.pin_messages else "✅ التثبيت")
+                    r_list.append("❌ الإضافة" if rights.invite_users else "✅ الإضافة")
+                    restricted_rights_text += " | ".join(r_list)
+                else:
+                    restricted_rights_text += "🔓 مفتوحة بالكامل (كل الصلاحيات متاحة)"
+            else:
+                full = await ABH(GetFullChatRequest(chat_id))
+                members_count = len(full.full_chat.users)
+                restricted_rights_text += "🔓 مفتوحة بالكامل (مجموعة عادية)"
+
+            status_flags = []
+            if getattr(chat, 'verified', False): status_flags.append("🟢 موثق")
+            if getattr(chat, 'scam', False): status_flags.append("⚠️ نصب (Scam)")
+            if getattr(chat, 'fake', False): status_flags.append("⚠️ وهمي (Fake)")
+            if not status_flags: status_flags.append("⚪ غير مصنف")
+            
+            role = "عضو طبيعي"
+            if getattr(chat, 'creator', False): role = "المالك الأساسي 👑"
+            elif getattr(chat, 'admin_rights', None): role = "مشرف (Admin) 🛠️"
+
+            report = (
+                f"📡 **رادار كشف وتجميع بيانات المجموعة:**\n\n"
+                f"👥 **الاسم:** `{title}`\n"
+                f"🆔 **الأيدي:** `{chat_id}`\n"
+                f"🏷️ **المعرف:** `{username}`\n"
+                f"📝 **الوصف:**\n`{about}`\n\n"
+                f"📊 **إحصائيات الأعضاء:**\n"
+                f" ├ عدد الأعضاء: `{members_count}`\n"
+                f" └ عدد المشرفين: `{admins_count}`\n\n"
+                f"⚙️ **إعدادات وقيود الكروب:**\n"
+                f" ├ رتبة ديدي هنا: **{role}**\n"
+                f" ├ الوضع البطيء: `{slowmode}`\n"
+                f" └ حالة الأمان: `{' | '.join(status_flags)}`\n\n"
+                f"🛡️ **{restricted_rights_text}**"
+            )
+            await status_msg.edit(report)
+        except Exception as e:
+            await status_msg.edit(f"❌ **فشل رادار الكروب:** حدث خطأ أثناء جلب البيانات.\nالخطأ: `{e}`")
+        return
+
+    # 🖥️ أوامر أدوات النظام المباشرة والسريعة
+    if raw_text in ["ديدي وضعك", "ديدي السيرفر", "ديدي النظام"]:
+        await event.reply(get_system_status())
+        return
+
+    # تشغيل ميزة الرادار ولوحة الإحصائيات المتقدمة (Ultimate Stats Monitor)
+    if raw_text in ["ديدي رادار", "ديدي احصائيات"]:
+        status_msg = await event.reply("📡 **جاري فحص مؤشرات الرادار الحية وحساب البيانات... ثواني**")
+        report = await get_advanced_radar_stats(ABH)
+        await status_msg.edit(report)
+        return
+        
+    if raw_text == "ديدي صفر الكاش":
+        conn = sqlite3.connect(DB_FILE)
+        conn.cursor().execute("DELETE FROM song_cache")
+        conn.commit(); conn.close()
+        await event.reply("🗑️ تم تصفير الكاش المؤرشف بداخل قاعدة البيانات بنجاح!")
+        return
+
+    # 🕵️‍♂️ تنفيذ أمر كاشف الحسابات الوهمية / المحذوفة
+    if raw_text.startswith("ديدي فحص حساب"):
+        target = None
+        reply_msg = await event.get_reply_message()
+        
+        if reply_msg:
+            target = reply_msg.sender_id
+        else:
+            cmd_args = raw_text.replace("ديدي فحص حساب", "").strip()
+            if cmd_args:
+                target = cmd_args
+                
+        if target:
+            status_msg = await event.reply("🔍 جاري فحص الحساب جيو-سيبرانياً وحساب مؤشرات الشبهة...")
+            report = await analyze_telegram_account(target)
+            await status_msg.edit(report)
+        else:
+            await event.reply("⚠️ يرجى استخدام الأمر بالرد على رسالة الشخص، أو كتابة اليوزر نيم/الأيدي بعد الأمر (مثال: `ديدي فحص حساب @username`).")
+        return
+
+    # 🌐 أدوات فحص الـ OSINT المرنة بالـ Regex
+    if re.search(r'(?:افحص|فحص)\s+(?:الأيبي|الايب|ايبي|ايب)\s+([\d\.]+)', raw_text, flags=re.IGNORECASE):
+        match_ip = re.search(r'(?:افحص|فحص)\s+(?:الأيبي|الايب|ايبي|ايب)\s+([\d\.]+)', raw_text, flags=re.IGNORECASE)
+        if match_ip:
+            target_ip = match_ip.group(1)
+            await event.reply(ip_lookup(target_ip.strip()))
+        return
+
+    if re.search(r'(?:افحص|فحص)\s+بورتات\s+([^\s]+)', raw_text, flags=re.IGNORECASE):
+        match_port = re.search(r'(?:افحص|فحص)\s+بورتات\s+([^\s]+)', raw_text, flags=re.IGNORECASE)
+        if match_port:
+            target_host = match_port.group(1)
+            status_msg = await event.reply("⚡ جاري فحص البورتات الأساسية سيبرانياً، ثواني...")
+            report = await scan_ports(target_host.strip())
+            await status_msg.edit(report)
+        return
+
+    if raw_text.startswith("ديدي فحص يوزر "):
+        target_user = raw_text.replace("ديدي فحص يوزر ", "").strip()
+        status_msg = await event.reply("🕵️‍♂️ جاري تتبع وفحص المعرف الاستخباراتي عبر المنصات العالمية...")
+        report = await osint_username_lookup(target_user)
+        await status_msg.edit(report, link_preview=False)
+        return
 # --- [ 4. محرك تنفيذ أكواد البايثون في الخلفية ] ---
 async def execute_python(event, code):
     old_stdout, old_stderr = sys.stdout, sys.stderr
