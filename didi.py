@@ -1,7 +1,7 @@
 import asyncio, os, sys, io, yt_dlp, sqlite3, re
 from datetime import datetime
 from telethon import events
-from ABH import ABH استيراد العميل الصحيح من ملف الاتصال
+from ABH import ABH 
 
 # --- [ 1. المتغيرات العامة وقواعد البيانات المؤقتة ] ---
 OWNER_ID = 1247061935  # ضع الأيدي الخاص بك هنا
