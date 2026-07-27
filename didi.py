@@ -40,30 +40,6 @@ async def master_handler(event):
         # إذا كان الرابط ملغماً: اعمل delete() + return فوراً
         pass
 
-    # =================================================================
-    # الأولوية رقم 2: جدار حماية الجروبات والـ Anti-Spam (لغير المالك)
-    # =================================================================
-    if event.is_group and sender_id != OWNER_ID:
-        now = datetime.now()
-        if sender_id not in spam_tracker:
-            spam_tracker[sender_id] = []
-        
-        # تنظيف الطوابع الزمنية القديمة (أكثر من 5 ثوانٍ)
-        spam_tracker[sender_id] = [t for t in spam_tracker[sender_id] if (now - t).total_seconds() < 5]
-        spam_tracker[sender_id].append(now)
-
-        # التحقق من المخالفة (إرسال التنبيه مرة واحدة فقط لتجنب الـ Flood)
-        if len(spam_tracker[sender_id]) == 6:
-            try:
-                await event.delete()
-                await event.respond(f"⚠️ **تنبيه حماية الجروب**\n[المستخدم](tg://user?id={sender_id}) يسوي سبام مكثف، تم قمع رسائله تلقائياً 🛡")
-                return
-            except: pass
-        elif len(spam_tracker[sender_id]) > 6:
-            try:
-                await event.delete()  # حذف صامت للمخالفات المستمرة
-                return
-            except: pass
 
     # =================================================================
     # الأولوية رقم 3: جدار صلاحية التحكم باليوزر بوت (Userbot Authorization)
