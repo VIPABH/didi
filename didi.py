@@ -491,6 +491,83 @@ async def didi_handler(event):
         conn.commit(); conn.close()
         await event.reply("🗑️ تم تصفير الكاش المؤرشف بداخل قاعدة البيانات بنجاح!")
         return
+    # تشغيل ميزة الرادار ولوحة الإحصائيات المتقدمة (Ultimate Stats Monitor)
+    if raw_text in ["ديدي رادار", "ديدي احصائيات"]:
+        status_msg = await event.reply("📡 **جاري فحص مؤشرات الرادار الحية وحساب البيانات... ثواني**")
+        report = await get_advanced_radar_stats(event.client)
+        await status_msg.edit(report)
+        return
+        
+    if raw_text == "ديدي صفر الكاش":
+        conn = sqlite3.connect(DB_FILE)
+        conn.cursor().execute("DELETE FROM song_cache")
+        conn.commit(); conn.close()
+        await event.reply("🗑️ تم تصفير الكاش المؤرشف بداخل قاعدة البيانات بنجاح!")
+        return
+    # 📦 ميزة التخزين السريع والمستودع الخاص مع التقرير الاستخباراتي الدقيق للرسالة والمرسل
+    if raw_text.strip() == "وك":
+        reply_msg = await event.get_reply_message()
+        if reply_msg:
+            try:
+                # 1. توجيه الرسالة الأصلية بأمان للحفاظ على جودتها ومحتواها
+                forwarded = await client.forward_messages(STORAGE_CHAT_ID, reply_msg)
+                forwarded_id = forwarded[0].id if isinstance(forwarded, list) else forwarded.id
+                
+                # 2. استخراج بيانات دقيقة ومعمقة عن المرسل والمصدر
+                sender = await reply_msg.get_sender()
+                chat = await reply_msg.get_chat()
+                
+                sender_name = "غير معروف"
+                sender_uid = "لا يوجد"
+                sender_username = "لا يوجد"
+                
+                if sender:
+                    sender_uid = sender.id
+                    if hasattr(sender, 'first_name'):
+                        sender_name = f"{sender.first_name or ''} {getattr(sender, 'last_name', '') or ''}".strip()
+                    elif hasattr(sender, 'title'):
+                        sender_name = sender.title
+                    sender_username = f"@{sender.username}" if getattr(sender, 'username', None) else "لا يوجد"
+                
+                chat_title = "محادثة خاصة (DM)"
+                chat_cid = reply_msg.chat_id
+                chat_username = "لا يوجد"
+                msg_link = "لا يوجد"
+                
+                if chat:
+                    chat_cid = chat.id
+                    chat_title = getattr(chat, 'title', 'محادثة خاصة')
+                    if getattr(chat, 'username', None):
+                        chat_username = f"@{chat.username}"
+                        msg_link = f"https://t.me/{chat.username}/{reply_msg.id}"
+                
+                msg_date = reply_msg.date.strftime("%Y-%m-%d %I:%M:%S %p")
+                
+                # 3. بناء تقرير البيانات التفصيلي
+                info_report = (
+                    f"📋 **تقرير ديدي الاستخباراتي للرسالة المخزنة:**\n\n"
+                    f"👤 **بيانات المرسل (Sender Info):**\n"
+                    f" ├ الاسم: `{sender_name}`\n"
+                    f" ├ الأيدي: `{sender_uid}`\n"
+                    f" └ المعرف: `{sender_username}`\n\n"
+                    f"🧱 **بيانات مصدر الرسالة (Source Info):**\n"
+                    f" ├ اسم المكان: `{chat_title}`\n"
+                    f" ├ أيدي المحادثة: `{chat_cid}`\n"
+                    f" └ معرف المحادثة: `{chat_username}`\n\n"
+                    f"⏱️ **تفاصيل الرسالة والسجل الزمنّي:**\n"
+                    f" ├ أيدي الرسالة: `{reply_msg.id}`\n"
+                    f" ├ التوقيت الحي: `{msg_date}`\n"
+                    f" └ رابط التوجيه: {msg_link if msg_link != 'لا يوجد' else '`مجموعة خاصة أو خاص`'}\n"
+                )
+                
+                # إرسال التقرير بالرد على الرسالة الموجهة داخل المستودع لربط الملفات ببياناتها
+                await client.send_message(STORAGE_CHAT_ID, info_report, reply_to=forwarded_id)
+                await event.reply("📦")
+            except Exception as e:
+                await event.reply(f"❌ **فشل التخزين:** تأكد من إعدادات سطر 24 وصلاحيات الكروب.\nالخطأ البرمجي: `{e}`")
+        else:
+            await event.reply("⚠️ **تنبيه:** يرجى استخدام أمر `تخزين` بالرد (Reply) مباشرةً على الرسالة التي تريد حفظها!")
+        return
 
     # 🕵️‍♂️ تنفيذ أمر كاشف الحسابات الوهمية / المحذوفة
     if raw_text.startswith("ديدي فحص حساب"):
@@ -561,3 +638,8 @@ async def execute_python(event, code):
         report += "✅ *تم تنفيذ الكود بنجاح في الخلفية وبدون مخرجات نصية.*"
         
     await event.reply(report)
+
+if __name__ == '__main__':
+    print("🤖 جاري تشغيل بوت ABH...")
+    ABH.start()
+    ABH.run_until_disconnected()
