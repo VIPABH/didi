@@ -507,7 +507,7 @@ async def didi_handler(event):
         conn.commit(); conn.close()
         await event.reply("🗑️ تم تصفير الكاش المؤرشف بداخل قاعدة البيانات بنجاح!")
         return
-   @ABH.on(events.NewMessage( outgoing=True))
+@ABH.on(events.NewMessage(outgoing=True))
 async def didi_ai_handler(event):
     raw_text = event.raw_text
     if not raw_text:
