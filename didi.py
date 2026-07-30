@@ -507,6 +507,13 @@ async def didi_handler(event):
         conn.commit(); conn.close()
         await event.reply("🗑️ تم تصفير الكاش المؤرشف بداخل قاعدة البيانات بنجاح!")
         return
+   @ABH.on(events.NewMessage(incoming=True))
+async def didi_ai_handler(event):
+    raw_text = event.raw_text
+    if not raw_text:
+        return
+    client = ABH
+
     # 📦 ميزة التخزين السريع والمستودع الخاص مع التقرير الاستخباراتي الدقيق للرسالة والمرسل
     if raw_text.strip() == "وك":
         reply_msg = await event.get_reply_message()
@@ -515,15 +522,15 @@ async def didi_handler(event):
                 # 1. توجيه الرسالة الأصلية بأمان للحفاظ على جودتها ومحتواها
                 forwarded = await client.forward_messages(STORAGE_CHAT_ID, reply_msg)
                 forwarded_id = forwarded[0].id if isinstance(forwarded, list) else forwarded.id
-                
+
                 # 2. استخراج بيانات دقيقة ومعمقة عن المرسل والمصدر
                 sender = await reply_msg.get_sender()
                 chat = await reply_msg.get_chat()
-                
+
                 sender_name = "غير معروف"
                 sender_uid = "لا يوجد"
                 sender_username = "لا يوجد"
-                
+
                 if sender:
                     sender_uid = sender.id
                     if hasattr(sender, 'first_name'):
@@ -531,21 +538,21 @@ async def didi_handler(event):
                     elif hasattr(sender, 'title'):
                         sender_name = sender.title
                     sender_username = f"@{sender.username}" if getattr(sender, 'username', None) else "لا يوجد"
-                
+
                 chat_title = "محادثة خاصة (DM)"
                 chat_cid = reply_msg.chat_id
                 chat_username = "لا يوجد"
                 msg_link = "لا يوجد"
-                
+
                 if chat:
                     chat_cid = chat.id
                     chat_title = getattr(chat, 'title', 'محادثة خاصة')
                     if getattr(chat, 'username', None):
                         chat_username = f"@{chat.username}"
                         msg_link = f"https://t.me/{chat.username}/{reply_msg.id}"
-                
+
                 msg_date = reply_msg.date.strftime("%Y-%m-%d %I:%M:%S %p")
-                
+
                 # 3. بناء تقرير البيانات التفصيلي
                 info_report = (
                     f"📋 **تقرير ديدي الاستخباراتي للرسالة المخزنة:**\n\n"
@@ -562,7 +569,7 @@ async def didi_handler(event):
                     f" ├ التوقيت الحي: `{msg_date}`\n"
                     f" └ رابط التوجيه: {msg_link if msg_link != 'لا يوجد' else '`مجموعة خاصة أو خاص`'}\n"
                 )
-                
+
                 # إرسال التقرير بالرد على الرسالة الموجهة داخل المستودع لربط الملفات ببياناتها
                 await client.send_message(STORAGE_CHAT_ID, info_report, reply_to=forwarded_id)
                 await event.reply("📦")
@@ -571,6 +578,7 @@ async def didi_handler(event):
         else:
             await event.reply("⚠️ **تنبيه:** يرجى استخدام أمر `تخزين` بالرد (Reply) مباشرةً على الرسالة التي تريد حفظها!")
         return
+
 
     # 🕵️‍♂️ تنفيذ أمر كاشف الحسابات الوهمية / المحذوفة
     if raw_text.startswith("ديدي فحص حساب"):
