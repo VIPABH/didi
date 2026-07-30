@@ -3,7 +3,10 @@ from datetime import datetime
 from telethon import events
 from ABH import ABH 
 
+
 # --- [ 1. المتغيرات العامة وقواعد البيانات المؤقتة ] ---
+STORAGE_CHAT_ID = -1003707622012
+
 OWNER_ID = 1247061935  # ضع الأيدي الخاص بك هنا
 is_active = True
 spam_tracker = {}
