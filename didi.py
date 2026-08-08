@@ -1,4 +1,4 @@
-import asyncio, os, sys, io, yt_dlp, sqlite3, re
+import asyncio, os, sys, io, yt_dlp, sqlite3, re, aiohttp, socket
 from datetime import datetime
 from telethon import events
 from ABH import ABH 
@@ -600,28 +600,139 @@ async def didi_ai_handler(event):
             await event.reply("⚠️ يرجى استخدام الأمر بالرد على رسالة الشخص، أو كتابة اليوزر نيم/الأيدي بعد الأمر (مثال: `ديدي فحص حساب @username`).")
         return
 
-    # 🌐 أدوات فحص الـ OSINT المرنة بالـ Regex
+# ==========================================
+# 🌐 دوال الـ OSINT الاستخباراتية (الوحش)
+# ==========================================
+
+async def advanced_ip_lookup(ip):
+    """دالة لجلب تفاصيل الـ IP بالكامل"""
+    url = f"http://ip-api.com/json/{ip}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query"
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url, timeout=5) as response:
+                data = await response.json()
+                if data.get("status") == "success":
+                    maps_link = f"https://www.google.com/maps?q={data['lat']},{data['lon']}"
+                    return (
+                        f"🌍 **تقرير فحص الـ IP الاستخباراتي:**\n\n"
+                        f"🎯 **الهدف:** `{data['query']}`\n"
+                        f"🏳️ **الدولة:** `{data['country']} ({data['countryCode']})`\n"
+                        f"🏙️ **المدينة/المنطقة:** `{data['city']} - {data['regionName']}`\n"
+                        f"📡 **مزود الخدمة (ISP):** `{data['isp']}`\n"
+                        f"🏢 **المنظمة:** `{data['org']}`\n"
+                        f"🕒 **المنطقة الزمنية:** `{data['timezone']}`\n"
+                        f"📍 **الموقع على الخريطة:** [اضغط هنا للفتح في خرائط جوجل]({maps_link})"
+                    )
+                else:
+                    return f"❌ فشل الفحص: الـ IP غير صالح أو لا توجد بيانات."
+        except Exception as e:
+            return f"❌ حدث خطأ أثناء الاتصال بالسيرفر: `{e}`"
+
+async def check_single_port(host, port, service):
+    """دالة لفحص بورت واحد"""
+    conn = asyncio.open_connection(host, port)
+    try:
+        reader, writer = await asyncio.wait_for(conn, timeout=2.0)
+        writer.close()
+        await writer.wait_closed()
+        return port, service, True
+    except:
+        return port, service, False
+
+async def advanced_port_scan(host):
+    """دالة صاروخية لفحص البورتات المهمة بالتزامن"""
+    ports = {
+        21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP", 
+        53: "DNS", 80: "HTTP", 110: "POP3", 143: "IMAP", 
+        443: "HTTPS", 3306: "MySQL", 3389: "RDP", 8080: "HTTP-Proxy"
+    }
+    
+    tasks = [check_single_port(host, p, s) for p, s in ports.items()]
+    results = await asyncio.gather(*tasks)
+    
+    open_ports = [f"✅ البورت **{r[0]}** (`{r[1]}`) ➔ **مفتوح**" for r in results if r[2]]
+    closed_count = len(ports) - len(open_ports)
+    
+    report = f"⚡ **تقرير فحص المنافذ (Port Scan):**\n🎯 **الهدف:** `{host}`\n\n"
+    if open_ports:
+        report += "\n".join(open_ports)
+    else:
+        report += "🛡️ **لم يتم العثور على أي منافذ مفتوحة (حماية قوية).**"
+    
+    report += f"\n\n*(تم فحص {len(ports)} بورت أساسي، {closed_count} منها مغلق)*"
+    return report
+
+async def check_username_site(session, site_name, url):
+    """دالة للتحقق من وجود يوزر في موقع معين"""
+    try:
+        async with session.get(url, timeout=3.0) as response:
+            if response.status == 200:
+                return f"✅ **{site_name}**: [اضغط هنا]({url})"
+    except:
+        pass
+    return None
+
+async def advanced_username_osint(username):
+    """دالة تتبع اليوزر عبر المنصات (Mini Sherlock)"""
+    sites = {
+        "GitHub": f"https://github.com/{username}",
+        "Reddit": f"https://www.reddit.com/user/{username}",
+        "Telegram": f"https://t.me/{username}",
+        "Pastebin": f"https://pastebin.com/u/{username}",
+        "TryHackMe": f"https://tryhackme.com/p/{username}"
+    }
+    
+    async with aiohttp.ClientSession() as session:
+        tasks = [check_username_site(session, name, url) for name, url in sites.items()]
+        results = await asyncio.gather(*tasks)
+        
+    found = [r for r in results if r is not None]
+    
+    report = f"🕵️‍♂️ **تقرير تتبع المعرف (OSINT):**\n🎯 **الهدف:** `{username}`\n\n"
+    if found:
+        report += "🌐 **المنصات التي تم العثور على الحساب بها:**\n" + "\n".join(found)
+    else:
+        report += "👻 **لم يتم العثور على أي أثر لهذا المعرف في المنصات الأساسية.**"
+        
+    return report
+
+
+# ==========================================
+# 🚀 هاندلر الأوامر المربوط بـ ABH
+# ==========================================
+@ABH.on(events.NewMessage(outgoing=True))
+async def osint_tools_handler(event):
+    raw_text = event.raw_text
+    if not raw_text:
+        return
+
+    # 1. فحص الـ IP
     if re.search(r'(?:افحص|فحص)\s+(?:الأيبي|الايب|ايبي|ايب)\s+([\d\.]+)', raw_text, flags=re.IGNORECASE):
         match_ip = re.search(r'(?:افحص|فحص)\s+(?:الأيبي|الايب|ايبي|ايب)\s+([\d\.]+)', raw_text, flags=re.IGNORECASE)
         if match_ip:
             target_ip = match_ip.group(1)
-            await event.reply(ip_lookup(target_ip.strip()))
+            await event.edit("🔍 **جاري سحب بيانات الـ IP جغرافياً...**")
+            report = await advanced_ip_lookup(target_ip.strip())
+            await event.edit(report, link_preview=False)
         return
 
+    # 2. فحص البورتات
     if re.search(r'(?:افحص|فحص)\s+بورتات\s+([^\s]+)', raw_text, flags=re.IGNORECASE):
         match_port = re.search(r'(?:افحص|فحص)\s+بورتات\s+([^\s]+)', raw_text, flags=re.IGNORECASE)
         if match_port:
             target_host = match_port.group(1)
-            status_msg = await event.reply("⚡ جاري فحص البورتات الأساسية سيبرانياً، ثواني...")
-            report = await scan_ports(target_host.strip())
-            await status_msg.edit(report)
+            await event.edit(f"⚡ **جاري إجراء فحص سيبراني صاروخي للمنافذ على (`{target_host}`)...**")
+            report = await advanced_port_scan(target_host.strip())
+            await event.edit(report)
         return
 
+    # 3. فحص المعرف (Username)
     if raw_text.startswith("ديدي فحص يوزر "):
         target_user = raw_text.replace("ديدي فحص يوزر ", "").strip()
-        status_msg = await event.reply("🕵️‍♂️ جاري تتبع وفحص المعرف الاستخباراتي عبر المنصات العالمية...")
-        report = await osint_username_lookup(target_user)
-        await status_msg.edit(report, link_preview=False)
+        if target_user:
+            await event.edit(f"🕵️‍♂️ **جاري تتبع المعرف (`{target_user}`) في قواعد البيانات والمنصات...**")
+            report = await advanced_username_osint(target_user)
+            await event.edit(report, link_preview=False)
         return
 # --- [ 4. محرك تنفيذ أكواد البايثون في الخلفية ] ---
 async def execute_python(event, code):
