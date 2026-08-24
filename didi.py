@@ -2,9 +2,7 @@ import asyncio, os, sys, io, yt_dlp, sqlite3, re, aiohttp, socket
 from datetime import datetime
 from telethon import events
 from ABH import ABH 
-from pytgcalls import PyTgCalls, idle
-from pytgcalls.types import AudioPiped, AudioQuality, HighQualityAudio
-from pytgcalls.exceptions import NoActiveGroupCall, GroupCallNotFound
+
 
 # --- [ 1. المتغيرات العامة وقواعد البيانات المؤقتة ] ---
 STORAGE_CHAT_ID = -1003707622012
