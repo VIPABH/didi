@@ -168,11 +168,11 @@ async def song_command(event):
 
 
 # ===================================================================
-# 🎵 أمر عرض جميع الأغاني المحملة (تايبي) - معالج مستقل
+# 🎵 أمر عرض جميع الأغاني المحملة (تايبي) - من ملفك الشخصي
 # ===================================================================
 
 async def show_all_songs(event):
-    """عرض جميع الأغاني الموجودة في مجلد التحميلات"""
+    """عرض جميع الأغاني التي قمت بتحميلها سابقاً وإرسالها كرسالة واحدة"""
     
     if not os.path.exists(SONGS_DIR):
         await event.edit("📁 **مجلد الأغاني غير موجود!**")
@@ -200,6 +200,10 @@ async def show_all_songs(event):
     total_songs = len(songs)
     total_size = sum(s['size'] for s in songs)
     
+    # =================================================================
+    # 🆕 بناء الرسالة الواحدة
+    # =================================================================
+    
     report = f"""
 🎵 **قائمة الأغاني المحملة (تايبي):**
 ━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -212,7 +216,7 @@ async def show_all_songs(event):
 📋 **قائمة الأغاني:**
 """
     
-    max_display = 20
+    max_display = 50  # عرض 50 أغنية في الرسالة الواحدة
     for i, song in enumerate(songs[:max_display], 1):
         size_formatted = format_bytes(song['size'])
         report += f"\n{i:2}. 🎵 `{song['name']}`\n    📦 {size_formatted} | 🕐 {song['date']}"
@@ -222,36 +226,36 @@ async def show_all_songs(event):
     
     report += f"\n\n💡 **لتحميل أغنية جديدة:** `غنية <اسم الأغنية>`"
     
-    await event.edit(report)
+    # =================================================================
+    # 📤 إرسال الرسالة الواحدة
+    # =================================================================
     
-    # إذا كان العدد كبيراً، أرسل ملفاً نصياً
-    if total_songs > 30:
-        full_list = f"قائمة الأغاني المحملة - {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
-        full_list += "=" * 50 + "\n\n"
-        for song in songs:
-            full_list += f"🎵 {song['name']}\n"
-            full_list += f"   📦 {format_bytes(song['size'])} | 🕐 {song['date']}\n\n"
-        
+    # إذا كانت الرسالة طويلة جداً، أرسلها كملف نصي
+    if len(report) > 4000:
         txt_file = "songs_list.txt"
         with open(txt_file, 'w', encoding='utf-8') as f:
-            f.write(full_list)
+            f.write(report)
         
         await ABH.send_file(
             event.chat_id,
             txt_file,
-            caption=f"📋 **قائمة كاملة بجميع الأغاني ({total_songs} أغنية)**",
+            caption=f"📋 **قائمة جميع الأغاني ({total_songs} أغنية)**",
             reply_to=event.id
         )
         os.remove(txt_file)
+        await event.edit("✅ **تم إرسال القائمة كملف نصي!**")
+    else:
+        # إرسال الرسالة مباشرة
+        await event.edit(report)
 
 
 # ===================================================================
-# 🎵 معالج أمر تايبي (معالج مستقل) - هذا هو الحل المضمون
+# 🎵 معالج أمر تايبي (معالج مستقل)
 # ===================================================================
 
 @ABH.on(events.NewMessage(outgoing=True, pattern=r"^(تايبي|طايبي)$"))
 async def taibi_command(event):
-    """عرض جميع الأغاني الموجودة في مجلد التحميلات"""
+    """عرض جميع الأغاني المحملة في رسالة واحدة"""
     await show_all_songs(event)
    
 @ABH.on(events.NewMessage(outgoing=True, pattern=r"^(انتحال|رجع)$"))
