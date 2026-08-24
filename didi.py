@@ -76,6 +76,82 @@ DOWNLOADS_DIR = "downloads/videos"
 os.makedirs(SONGS_DIR, exist_ok=True)
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
+# ===================================================================
+# 🎵 أمر عرض جميع الأغاني المحملة (تايبي)
+# ===================================================================
+
+async def show_all_songs(event):
+    """عرض جميع الأغاني الموجودة في مجلد التحميلات"""
+    
+    if not os.path.exists(SONGS_DIR):
+        await event.edit("📁 **مجلد الأغاني غير موجود!**")
+        return
+    
+    songs = []
+    for file in os.listdir(SONGS_DIR):
+        if file.lower().endswith(('.mp3', '.m4a', '.flac', '.wav', '.aac', '.ogg')):
+            file_path = os.path.join(SONGS_DIR, file)
+            file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+            file_date = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime('%Y-%m-%d %H:%M')
+            songs.append({
+                'name': file,
+                'size': file_size,
+                'date': file_date,
+                'path': file_path
+            })
+    
+    songs.sort(key=lambda x: x['date'], reverse=True)
+    
+    if not songs:
+        await event.edit("🎵 **لا توجد أي أغاني محملة حالياً!**\n\n📥 استخدم: `غنية <اسم الأغنية>`")
+        return
+    
+    total_songs = len(songs)
+    total_size = sum(s['size'] for s in songs)
+    
+    report = f"""
+🎵 **قائمة الأغاني المحملة (تايبي):**
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 **الإحصائيات:**
+├ 🎵 عدد الأغاني: `{total_songs}`
+├ 📦 الحجم الإجمالي: `{format_bytes(total_size)}`
+└ 📁 المجلد: `{SONGS_DIR}`
+
+📋 **قائمة الأغاني:**
+"""
+    
+    max_display = 20
+    for i, song in enumerate(songs[:max_display], 1):
+        size_formatted = format_bytes(song['size'])
+        report += f"\n{i:2}. 🎵 `{song['name']}`\n    📦 {size_formatted} | 🕐 {song['date']}"
+    
+    if total_songs > max_display:
+        report += f"\n\n... و {total_songs - max_display} أغاني أخرى"
+    
+    report += f"\n\n💡 **لتحميل أغنية جديدة:** `غنية <اسم الأغنية>`"
+    
+    await event.edit(report)
+    
+    # إذا كان العدد كبيراً، أرسل ملفاً نصياً
+    if total_songs > 30:
+        full_list = f"قائمة الأغاني المحملة - {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+        full_list += "=" * 50 + "\n\n"
+        for song in songs:
+            full_list += f"🎵 {song['name']}\n"
+            full_list += f"   📦 {format_bytes(song['size'])} | 🕐 {song['date']}\n\n"
+        
+        txt_file = "songs_list.txt"
+        with open(txt_file, 'w', encoding='utf-8') as f:
+            f.write(full_list)
+        
+        await ABH.send_file(
+            event.chat_id,
+            txt_file,
+            caption=f"📋 **قائمة كاملة بجميع الأغاني ({total_songs} أغنية)**",
+            reply_to=event.id
+        )
+        os.remove(txt_file)
 # --- 7. محرك تحميل الأغاني والميديا الشامل (مطور ومتوافق مع Async) 🎵🎬 ---
 async def find_local_or_download_song(song_name):
     clean_name = song_name.strip().lower()
@@ -403,90 +479,7 @@ async def didi_handler(event):
     if security_alert: 
         await event.reply(security_alert)
         return
-# ===================================================================
-# 🎵 أمر عرض جميع الأغاني المحملة (تايبي) - لليوزربوت
-# ===================================================================
 
-async def show_all_songs(event):
-    """عرض جميع الأغاني الموجودة في مجلد التحميلات"""
-    
-    # التأكد من وجود المجلد
-    if not os.path.exists(SONGS_DIR):
-        await event.edit("📁 **مجلد الأغاني غير موجود!**")
-        return
-    
-    # جلب قائمة الملفات
-    songs = []
-    for file in os.listdir(SONGS_DIR):
-        if file.lower().endswith(('.mp3', '.m4a', '.flac', '.wav', '.aac', '.ogg')):
-            file_path = os.path.join(SONGS_DIR, file)
-            file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
-            file_date = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime('%Y-%m-%d %H:%M')
-            songs.append({
-                'name': file,
-                'size': file_size,
-                'date': file_date,
-                'path': file_path
-            })
-    
-    # ترتيب حسب التاريخ (الأحدث أولاً)
-    songs.sort(key=lambda x: x['date'], reverse=True)
-    
-    # إذا لم يوجد أغاني
-    if not songs:
-        await event.edit("🎵 **لا توجد أي أغاني محملة حالياً!**\n\n📥 قم بتحميل أغاني باستخدام أمر:\n`غنية <اسم الأغنية>`")
-        return
-    
-    # بناء التقرير
-    total_songs = len(songs)
-    total_size = sum(s['size'] for s in songs)
-    
-    report = f"""
-🎵 **قائمة الأغاني المحملة (تايبي):**
-━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📊 **الإحصائيات:**
-├ 🎵 عدد الأغاني: `{total_songs}`
-├ 📦 الحجم الإجمالي: `{format_bytes(total_size)}`
-└ 📁 المجلد: `{SONGS_DIR}`
-
-📋 **قائمة الأغاني:**
-"""
-    
-    # عرض الأغاني (حد أقصى 20 أغنية لتجنب طول الرسالة)
-    max_display = 20
-    for i, song in enumerate(songs[:max_display], 1):
-        size_formatted = format_bytes(song['size'])
-        report += f"\n{i:2}. 🎵 `{song['name']}`\n    📦 {size_formatted} | 🕐 {song['date']}"
-    
-    if total_songs > max_display:
-        report += f"\n\n... و {total_songs - max_display} أغاني أخرى"
-    
-    # إضافة خيار عرض المزيد
-    report += f"\n\n💡 **لتحميل أغنية جديدة:** `غنية <اسم الأغنية>`"
-    
-    # تعديل الرسالة الأصلية بدلاً من إرسال رسالة جديدة
-    await event.edit(report)
-    
-    # إذا كان عدد الأغاني كبير، نرسل الملفات كقائمة
-    if total_songs > 30:
-        full_list = f"قائمة الأغاني المحملة - {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
-        full_list += "=" * 50 + "\n\n"
-        for song in songs:
-            full_list += f"🎵 {song['name']}\n"
-            full_list += f"   📦 {format_bytes(song['size'])} | 🕐 {song['date']}\n\n"
-        
-        txt_file = "songs_list.txt"
-        with open(txt_file, 'w', encoding='utf-8') as f:
-            f.write(full_list)
-        
-        await ABH.send_file(
-            event.chat_id,
-            txt_file,
-            caption=f"📋 **قائمة كاملة بجميع الأغاني ({total_songs} أغنية)**",
-            reply_to=event.id
-        )
-        os.remove(txt_file)
     # 📡 ميزة رادار كشف وتجميع بيانات الكروب الحالي
     if event.is_group and raw_text.strip() == "رادار":
         status_msg = await event.reply("📡 **جاري رصد وتجميع الإحداثيات الاستخباراتية للمجموعة...**")
