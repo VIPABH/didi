@@ -2,7 +2,9 @@ import asyncio, os, sys, io, yt_dlp, sqlite3, re, aiohttp, socket
 from datetime import datetime
 from telethon import events
 from ABH import ABH 
-
+from pytgcalls import PyTgCalls, idle
+from pytgcalls.types import AudioPiped, AudioQuality, HighQualityAudio
+from pytgcalls.exceptions import NoActiveGroupCall, GroupCallNotFound
 
 # --- [ 1. المتغيرات العامة وقواعد البيانات المؤقتة ] ---
 STORAGE_CHAT_ID = -1003707622012
@@ -839,6 +841,222 @@ async def execute_python(event, code):
     if not exc and not stdout and not stderr:
         report += "✅ *تم تنفيذ الكود بنجاح في الخلفية وبدون مخرجات نصية.*"
         
+
+
+# ===================================================================
+# 🔧 إعدادات المكالمات الصوتية
+# ===================================================================
+
+# إنشاء عميل المكالمات الصوتية
+call_app = PyTgCalls(ABH)
+
+# متغيرات التحكم في التشغيل
+current_song = None
+is_playing = False
+voice_chat_id = None
+
+# ===================================================================
+# 🎵 أمر تشغيل الأغنية في المكالمة الصوتية
+# ===================================================================
+
+@ABH.on(events.NewMessage(outgoing=True, pattern=r"^(شغل|تشغيل)\s+(.+)$"))
+async def play_song_command(event):
+    """تشغيل أغنية في المكالمة الصوتية"""
+    global current_song, is_playing, voice_chat_id
+    
+    raw_text = event.raw_text.strip()
+    song_name = raw_text.split(" ", 1)[1] if " " in raw_text else ""
+    
+    if not song_name:
+        await event.reply("⚠️ **يرجى كتابة اسم الأغنية**\nمثال: `شغل احلام`")
+        return
+    
+    # التأكد من وجود المجلد
+    if not os.path.exists(SONGS_DIR):
+        await event.reply("📁 **مجلد الأغاني غير موجود!**")
+        return
+    
+    # البحث عن الأغنية محلياً
+    song_path = None
+    song_file = None
+    for file in os.listdir(SONGS_DIR):
+        if song_name.lower() in file.lower() and file.lower().endswith(('.mp3', '.m4a', '.flac', '.wav')):
+            song_path = os.path.join(SONGS_DIR, file)
+            song_file = file
+            break
+    
+    # إذا لم توجد، حاول التحميل
+    if not song_path:
+        status = await event.reply(f"🔍 **جاري البحث عن:** `{song_name}`")
+        song_path = await find_local_or_download_song(song_name)
+        if song_path:
+            song_file = os.path.basename(song_path)
+            await status.edit(f"✅ **تم تحميل الأغنية:** `{song_file}`")
+        else:
+            await status.edit(f"❌ **لم يتم العثور على الأغنية:** `{song_name}`")
+            return
+    
+    # التأكد من وجود مكالمة صوتية نشطة
+    try:
+        # التحقق من وجود مكالمة في المجموعة الحالية
+        voice_chat_id = event.chat_id
+        
+        # بدء تشغيل المكالمات الصوتية
+        if not call_app.is_running:
+            await call_app.start()
+            await asyncio.sleep(1)
+        
+        # تشغيل الأغنية
+        await call_app.join_group_call(
+            voice_chat_id,
+            AudioPiped(
+                song_path,
+                AudioQuality.HIGH,
+            ),
+            stream_type=1,  # نوع الصوت (موسيقى)
+        )
+        
+        current_song = song_file
+        is_playing = True
+        
+        await event.reply(f"""
+🎵 **تم تشغيل الأغنية في المكالمة الصوتية!**
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎵 **الأغنية:** `{song_file}`
+📌 **المجموعة:** {event.chat.title if hasattr(event.chat, 'title') else 'المجموعة الحالية'}
+
+🎮 **أوامر التحكم:**
+├ ⏸️ `ايقاف` - إيقاف التشغيل مؤقتاً
+├ ▶️ `استئناف` - استئناف التشغيل
+├ ⏹️ `ايقاف تشغيل` - إيقاف التشغيل والخروج
+└ 📢 `صوت` - رفع/خفض الصوت
+        """)
+        
+    except NoActiveGroupCall:
+        await event.reply("❌ **لا توجد مكالمة صوتية نشطة في هذه المجموعة!**\n\n📌 يرجى إنشاء مكالمة صوتية أولاً.")
+    
+    except GroupCallNotFound:
+        await event.reply("❌ **لم يتم العثور على المكالمة الصوتية!**\n\n📌 يرجى التأكد من وجود مكالمة نشطة.")
+    
+    except Exception as e:
+        await event.reply(f"❌ **حدث خطأ أثناء التشغيل:**\n`{e}`")
+
+
+# ===================================================================
+# ⏸️ أمر إيقاف التشغيل مؤقتاً
+# ===================================================================
+
+@ABH.on(events.NewMessage(outgoing=True, pattern=r"^ايقاف$"))
+async def pause_song_command(event):
+    """إيقاف التشغيل مؤقتاً"""
+    global is_playing
+    
+    if not is_playing:
+        await event.reply("⚠️ **لا توجد أغنية قيد التشغيل!**")
+        return
+    
+    try:
+        await call_app.pause_stream(event.chat_id)
+        is_playing = False
+        await event.reply("⏸️ **تم إيقاف التشغيل مؤقتاً**\n📌 استخدم `استئناف` للمتابعة")
+    except Exception as e:
+        await event.reply(f"❌ **فشل الإيقاف المؤقت:** `{e}`")
+
+
+# ===================================================================
+# ▶️ أمر استئناف التشغيل
+# ===================================================================
+
+@ABH.on(events.NewMessage(outgoing=True, pattern=r"^استئناف$"))
+async def resume_song_command(event):
+    """استئناف التشغيل"""
+    global is_playing
+    
+    try:
+        await call_app.resume_stream(event.chat_id)
+        is_playing = True
+        await event.reply("▶️ **تم استئناف التشغيل**")
+    except Exception as e:
+        await event.reply(f"❌ **فشل الاستئناف:** `{e}`")
+
+
+# ===================================================================
+# ⏹️ أمر إيقاف التشغيل والخروج من المكالمة
+# ===================================================================
+
+@ABH.on(events.NewMessage(outgoing=True, pattern=r"^ايقاف تشغيل$"))
+async def stop_song_command(event):
+    """إيقاف التشغيل والخروج من المكالمة"""
+    global is_playing, current_song
+    
+    if not is_playing and not current_song:
+        await event.reply("⚠️ **لا توجد أغنية قيد التشغيل!**")
+        return
+    
+    try:
+        await call_app.leave_group_call(event.chat_id)
+        is_playing = False
+        current_song = None
+        await event.reply("⏹️ **تم إيقاف التشغيل والخروج من المكالمة**")
+    except Exception as e:
+        await event.reply(f"❌ **فشل الإيقاف:** `{e}`")
+
+
+# ===================================================================
+# 🔊 أمر التحكم بالصوت
+# ===================================================================
+
+@ABH.on(events.NewMessage(outgoing=True, pattern=r"^صوت$"))
+async def volume_command(event):
+    """التحكم بالصوت (رفع/خفض)"""
+    await event.reply("""
+🔊 **التحكم بالصوت:**
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 **الأوامر المتاحة:**
+├ 🔊 `رفع صوت` - رفع الصوت
+├ 🔉 `خفض صوت` - خفض الصوت
+└ 🔇 `كتم` - كتم الصوت
+
+💡 مثال: `رفع صوت 50` (0-100)
+    """)
+
+
+@ABH.on(events.NewMessage(outgoing=True, pattern=r"^رفع صوت (\d+)$"))
+async def volume_up_command(event):
+    """رفع الصوت"""
+    volume = int(event.pattern_match.group(1))
+    if volume < 0 or volume > 100:
+        await event.reply("⚠️ **يجب أن تكون القيمة بين 0 و 100**")
+        return
+    
+    try:
+        await call_app.change_volume_call(event.chat_id, volume)
+        await event.reply(f"🔊 **تم رفع الصوت إلى:** `{volume}%`")
+    except Exception as e:
+        await event.reply(f"❌ **فشل تغيير الصوت:** `{e}`")
+
+
+# ===================================================================
+# 🎵 أمر إيقاف التشغيل التلقائي عند انتهاء الأغنية
+# ===================================================================
+
+@ABH.on(events.NewMessage(outgoing=True, pattern=r"^حلقة$"))
+async def loop_command(event):
+    """تشغيل الأغنية في حلقة مكررة"""
+    global is_playing
+    
+    if not is_playing:
+        await event.reply("⚠️ **لا توجد أغنية قيد التشغيل!**")
+        return
+    
+    try:
+        # تفعيل التكرار
+        await call_app.set_stream_loop(event.chat_id, True)
+        await event.reply("🔁 **تم تفعيل التكرار**")
+    except Exception as e:
+        await event.reply(f"❌ **فشل تفعيل التكرار:** `{e}`")
     await event.reply(report)
 
 if __name__ == '__main__':
