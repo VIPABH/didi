@@ -839,8 +839,3 @@ async def execute_python(event, code):
     if not exc and not stdout and not stderr:
         report += "✅ *تم تنفيذ الكود بنجاح في الخلفية وبدون مخرجات نصية.*"
         
-
-if __name__ == '__main__':
-    print("🤖 جاري تشغيل بوت ABH...")
-    ABH.start()
-    ABH.run_until_disconnected()
