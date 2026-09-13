@@ -1,4 +1,4 @@
-from telethon.tl.types import KeyboardButtonUserProfile, ReplyKeyboardMarkup, KeyboardButtonRow, KeyboardButton
+from telethon.tl.types import InputKeyboardButtonUserProfile, ReplyKeyboardMarkup, KeyboardButtonRow, KeyboardButton
 from telethon.tl.types import DocumentAttributeFilename, DocumentAttributeAudio
 from telethon.tl.functions.photos import UploadProfilePhotoRequest
 from telethon.tl.functions.messages import SendReactionRequest
